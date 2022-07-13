@@ -69,7 +69,7 @@ The filename should match the audit ID.
 - No verbs.
 - No `no-` prefixes.
 - Use the noun of the items it surfaces or concept it centers around.
-- Adjective modifiers are acceptable and encouraged if the noun would be too broad without specificty.
+- Adjective modifiers are acceptable and encouraged if the noun would be too broad without specificity.
 - If an adjective modifier will result in describing either the passing or failing state, prefer the failing state.
 
 **Examples**

@@ -138,7 +138,7 @@ Budgets can be set for the follow resource types.
 
 _Lighthouse 5.3 & up_
 
-The `path` property indciates the pages that a budget applies to. This string should follow the [robots.txt](https://developers.google.com/search/reference/robots_txt#examples-of-valid-robotstxt-urls) format.
+The `path` property indicates the pages that a budget applies to. This string should follow the [robots.txt](https://developers.google.com/search/reference/robots_txt#examples-of-valid-robotstxt-urls) format.
 
 If `path` is not supplied, a budget will apply to all pages.
 

@@ -179,7 +179,7 @@ Examples:
 ```
 "firstPartyHostnames": ["pets.com"]
 ```
-Result: pets.com is considerated first-party, but fishes.pets.com is not.
+Result: pets.com is considered first-party, but fishes.pets.com is not.
 
 ```
 "firstPartyHostnames": ["*.pets.com"]

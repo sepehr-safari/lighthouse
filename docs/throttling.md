@@ -119,7 +119,7 @@ You may choose to calibrate if your benchmarkIndex is in a different range than 
 
 The `--throttling.cpuSlowdownMultiplier` CLI flag allows you to configure the throttling level applied. On a weaker machine, you can lower it from the default of 4x  to something more appropriate.
 
-The [Lighthouse CPU slowdown calculator webapp](https://lighthouse-cpu-throttling-calculator.vercel.app/) will compute what mutiplier to use from the  `CPU/Memory Power` value from the bottom of the report.
+The [Lighthouse CPU slowdown calculator webapp](https://lighthouse-cpu-throttling-calculator.vercel.app/) will compute what multiplier to use from the  `CPU/Memory Power` value from the bottom of the report.
 
 <a href="https://lighthouse-cpu-throttling-calculator.vercel.app/">
 <img src="https://user-images.githubusercontent.com/39191/101436708-8a991b00-38c3-11eb-89c5-7d43752932e9.png" width=300>

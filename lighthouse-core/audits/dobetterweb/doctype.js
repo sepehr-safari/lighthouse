@@ -5,8 +5,8 @@
  */
 'use strict';
 
-const Audit = require('../audit.js');
-const i18n = require('../../lib/i18n/i18n.js');
+import {Audit} from '../audit.js';
+import * as i18n from '../../lib/i18n/i18n.js';
 
 const UIStrings = {
   /** Title of a Lighthouse audit that provides detail on the doctype of a page. This descriptive title is shown to users when the pages's doctype is set to HTML. */
@@ -16,7 +16,7 @@ const UIStrings = {
   /** Description of a Lighthouse audit that tells the user why they should define an HTML doctype. This is displayed after a user expands the section to see more. No character length limits. 'Learn More' becomes link text to additional documentation. */
   description: 'Specifying a doctype prevents the browser ' +
     'from switching to quirks-mode. ' +
-    '[Learn more](https://web.dev/doctype/).',
+    '[Learn more about the doctype declaration](https://web.dev/doctype/).',
   /** Explanatory message stating that the document has no doctype. */
   explanationNoDoctype: 'Document must contain a doctype',
   /** Explanatory message stating that the document has wrong doctype */
@@ -29,7 +29,7 @@ const UIStrings = {
   explanationBadDoctype: 'Doctype name must be the string `html`',
 };
 
-const str_ = i18n.createMessageInstanceIdFn(__filename, UIStrings);
+const str_ = i18n.createMessageInstanceIdFn(import.meta.url, UIStrings);
 
 class Doctype extends Audit {
   /**
@@ -101,5 +101,5 @@ class Doctype extends Audit {
   }
 }
 
-module.exports = Doctype;
-module.exports.UIStrings = UIStrings;
+export default Doctype;
+export {UIStrings};

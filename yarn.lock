@@ -2954,10 +2954,10 @@ delayed-stream@~1.0.0:
   resolved "https://registry.yarnpkg.com/delayed-stream/-/delayed-stream-1.0.0.tgz#df3ae199acadfb7d440aaae0b29e2272b24ec619"
   integrity sha1-3zrhmayt+31ECqrgsp4icrJOxhk=
 
-devtools-protocol@0.0.981744, devtools-protocol@0.0.995287:
-  version "0.0.995287"
-  resolved "https://registry.yarnpkg.com/devtools-protocol/-/devtools-protocol-0.0.995287.tgz#843a846cff79d0f76a74818ec2d604a4fe90c2d0"
-  integrity sha512-HvTDDBKzY5ojCNmxAF+N+kZGQsl+hPZPIaWpG0q1BMuvUHdRwL4IrGKIH+avNLzCrImi/kKYDnsmZi7jjm0xlw==
+devtools-protocol@0.0.981744, devtools-protocol@0.0.999451:
+  version "0.0.999451"
+  resolved "https://registry.yarnpkg.com/devtools-protocol/-/devtools-protocol-0.0.999451.tgz#7113f2a34beb69c688e5e247980a54b5589a62d2"
+  integrity sha512-6TGLxJjCO2Ap+YWukCriwuFGwEmKayZ5b4oGEYnHQv1rXgaJAhBIpTWJWwsv/EBQlyPVDBxYuz3SVRs7Heq3RA==
 
 diff-sequences@^28.0.2:
   version "28.0.2"
@@ -4850,15 +4850,10 @@ jest-worker@^28.1.0:
     merge-stream "^2.0.0"
     supports-color "^8.0.0"
 
-jpeg-js@*, jpeg-js@^0.4.3:
-  version "0.4.3"
-  resolved "https://registry.yarnpkg.com/jpeg-js/-/jpeg-js-0.4.3.tgz#6158e09f1983ad773813704be80680550eff977b"
-  integrity sha512-ru1HWKek8octvUHFHvE5ZzQ1yAsJmIvRdGWvSoKV52XKyuyYA437QWDttXT8eZXDSbuMpHlLzPDZUPd6idIz+Q==
-
-jpeg-js@^0.4.1:
-  version "0.4.1"
-  resolved "https://registry.yarnpkg.com/jpeg-js/-/jpeg-js-0.4.1.tgz#937a3ae911eb6427f151760f8123f04c8bfe6ef7"
-  integrity sha512-jA55yJiB5tCXEddos8JBbvW+IMrqY0y1tjjx9KNVtA+QPmu7ND5j0zkKopClpUTsaETL135uOM2XfcYG4XRjmw==
+jpeg-js@*, jpeg-js@^0.4.1, jpeg-js@^0.4.4:
+  version "0.4.4"
+  resolved "https://registry.yarnpkg.com/jpeg-js/-/jpeg-js-0.4.4.tgz#a9f1c6f1f9f0fa80cdb3484ed9635054d28936aa"
+  integrity sha512-WZzeDOEtTOBK4Mdsar0IqEU5sMr3vSV2RqkAIzUEV2BHnUfKGyswWFPFwK5EeDo93K3FohSHbLAjj0s1Wzd+dg==
 
 js-library-detector@^6.5.0:
   version "6.5.0"
@@ -5109,10 +5104,10 @@ lighthouse-plugin-publisher-ads@^1.5.4:
     intl-messageformat "^4.1.2"
     yargs "^16.1.1"
 
-lighthouse-stack-packs@^1.8.1:
-  version "1.8.1"
-  resolved "https://registry.yarnpkg.com/lighthouse-stack-packs/-/lighthouse-stack-packs-1.8.1.tgz#d0772a79f5e7f933109077fb80ccdbd68a43a283"
-  integrity sha512-LSCu9Ugt9NPvRfBNzAjMDLvYev9r/93OTmbIWt9iXwiCmd999I/zneRTwsFLtlQWGKwNbDHS9vXnU+KpXUb1qg==
+lighthouse-stack-packs@1.8.2:
+  version "1.8.2"
+  resolved "https://registry.yarnpkg.com/lighthouse-stack-packs/-/lighthouse-stack-packs-1.8.2.tgz#55111bebe50ed516de3fad0a474795a2556ac36e"
+  integrity sha512-vlCUxxQAB8Nu6LQHqPpDRiMi06Du593/my/6JbMttQeEfJ7pf4OS8obSTh5xSOS80U/O7fq59Q8rQGAUxQatUQ==
 
 lines-and-columns@^1.1.6:
   version "1.2.4"
@@ -6131,10 +6126,9 @@ query-string@^4.1.0:
     object-assign "^4.1.0"
     strict-uri-encode "^1.0.0"
 
-quibble@^0.6.7:
+quibble@^0.6.7, quibble@connorjclark/quibble#mod-cache:
   version "0.6.9"
-  resolved "https://registry.yarnpkg.com/quibble/-/quibble-0.6.9.tgz#1e7b24a72b59bdb6cc272318448cd6b7eb61fbe8"
-  integrity sha512-EotkZs/lqgDdGsKzdmZuqu2ATgupQzhByUZ8oL3ElzCKDhXmgVLrX+WDe/StvrfB80h4EPOTElXuQifcfJwwFw==
+  resolved "https://codeload.github.com/connorjclark/quibble/tar.gz/b228a4ddbbad5061d36b465db2f364bb7c3291d3"
   dependencies:
     lodash "^4.17.21"
     resolve "^1.20.0"

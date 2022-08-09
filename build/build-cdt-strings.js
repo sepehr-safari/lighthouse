@@ -10,7 +10,7 @@ import {LH_ROOT} from '../root.js';
 
 // eslint-disable-next-line max-len
 const inFile = `${LH_ROOT}/node_modules/chrome-devtools-frontend/front_end/models/issues_manager/DeprecationIssue.ts`;
-const outFile = `${LH_ROOT}/lighthouse-core/lib/deprecations-strings.js`;
+const outFile = `${LH_ROOT}/core/lib/deprecations-strings.js`;
 
 const code = fs.readFileSync(inFile, 'utf-8');
 
@@ -68,7 +68,7 @@ import * as i18n from '../lib/i18n/i18n.js';
 
 ${uiStringsDeclare}
 
-const str_ = i18n.createMessageInstanceIdFn(import.meta.url, UIStrings);
+const str_ = i18n.createIcuMessageFn(import.meta.url, UIStrings);
 
 /**
  * @param {LH.Crdp.Audits.DeprecationIssueDetails} issueDetails

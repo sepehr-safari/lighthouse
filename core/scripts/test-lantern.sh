@@ -12,12 +12,12 @@ if [[ "$CI" ]]; then
   if [[ -z "$GITHUB_ACTIONS_COMMIT_RANGE" ]]; then echo "No commit range available!" && exit 1 ; fi
   CHANGED_FILES=$(git --no-pager diff --name-only "$GITHUB_ACTIONS_COMMIT_RANGE")
 else
-  CHANGED_FILES=$(git --no-pager diff --name-only master)
+  CHANGED_FILES=$(git --no-pager diff --name-only main)
 fi
 
 printf "Determined the following files have been touched:\n\n$CHANGED_FILES\n\n"
 
-if ! echo $CHANGED_FILES | grep -E 'dependency-graph|metrics|lantern|predictive-perf' > /dev/null; then
+if ! echo $CHANGED_FILES | grep -E 'dependency-graph|metrics|lantern|predictive-perf|network-recorder' > /dev/null; then
   echo "No lantern files affected, skipping lantern checks."
   exit 0
 fi

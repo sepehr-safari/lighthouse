@@ -8,6 +8,8 @@ set -euxo pipefail
 # Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 ##
 
+BUILD_FOLDER="${BUILD_FOLDER:-LighthouseIntegration}"
+
 if [ -d "$DEVTOOLS_PATH" ]
 then
   echo "Directory $DEVTOOLS_PATH already exists."
@@ -32,4 +34,8 @@ cd `dirname $DEVTOOLS_PATH`
 fetch --nohooks --no-history devtools-frontend
 cd devtools-frontend
 gclient sync
-gn gen out/Default --args='devtools_dcheck_always_on=true is_debug=false'
+if git config user.email | grep -q '@google.com'; then
+  gn gen "out/$BUILD_FOLDER" --args='devtools_dcheck_always_on=true is_debug=false use_goma=true'
+else
+  gn gen "out/$BUILD_FOLDER" --args='devtools_dcheck_always_on=true is_debug=false'
+fi

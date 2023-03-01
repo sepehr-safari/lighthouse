@@ -41,16 +41,6 @@ function getScreenDimensions(reportResult: LH.Result) {
   return {width, height};
 }
 
-function getFullPageScreenshot(reportResult: LH.Result) {
-  const fullPageScreenshotAudit = reportResult.audits['full-page-screenshot'];
-  const fullPageScreenshot =
-    fullPageScreenshotAudit?.details &&
-    fullPageScreenshotAudit.details.type === 'full-page-screenshot' &&
-    fullPageScreenshotAudit.details;
-
-  return fullPageScreenshot || null;
-}
-
 function getFilmstripFrames(
   reportResult: LH.Result
 ): Array<{data: string}> | undefined {
@@ -97,7 +87,7 @@ function useHashParams(...params: string[]) {
   return paramValues;
 }
 
-function useHashState(): LH.FlowResult.HashState|null {
+function useHashState(): LH.HashState|null {
   const flowResult = useFlowResult();
   const [indexString, anchor] = useHashParams('index', 'anchor');
 
@@ -156,7 +146,6 @@ export {
   OptionsContext,
   classNames,
   getScreenDimensions,
-  getFullPageScreenshot,
   getFilmstripFrames,
   getModeDescription,
   useFlowResult,

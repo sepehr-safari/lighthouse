@@ -6,7 +6,7 @@
 
 /**
  * Config file for sites with various errors, just fail out quickly.
- * @type {LH.Config.Json}
+ * @type {LH.Config}
  */
 const config = {
   extends: 'lighthouse:default',
@@ -31,7 +31,7 @@ const NONEMPTY_ARRAY = {
 const expectations = {
   lhr: {
     requestedUrl: 'http://localhost:10200/infinite-loop.html',
-    finalUrl: 'http://localhost:10200/infinite-loop.html',
+    finalDisplayedUrl: 'http://localhost:10200/infinite-loop.html',
     runtimeError: {code: 'PAGE_HUNG'},
     runWarnings: ['Lighthouse was unable to reliably load the URL you requested because the page stopped responding.'],
     audits: {

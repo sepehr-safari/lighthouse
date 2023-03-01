@@ -3,7 +3,6 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
-'use strict';
 
 /**
  * @fileoverview Returns a high-percentle (usually 98th) measure of how long it
@@ -31,7 +30,7 @@
  * @typedef {{name: 'FallbackTiming', duration: number}} FallbackTimingEvent
  */
 
-import ProcessedTrace from '../processed-trace.js';
+import {ProcessedTrace} from '../processed-trace.js';
 import {makeComputedArtifact} from '../computed-artifact.js';
 
 const KEYBOARD_EVENTS = new Set(['keydown', 'keypress', 'keyup']);
@@ -88,8 +87,11 @@ class Responsiveness {
       return evt.name === 'EventTiming' && evt.ph !== 'e';
     });
 
-    if (candidates.length && !candidates.some(candidate => candidate.args.data?.frame)) {
-      // Full EventTiming data added in https://crrev.com/c/3632661
+    // If trace is from < m103, the timestamps cannot be trusted, so we craft a fallback
+    // <m103 traces (bad) had a   args.frame
+    // m103+ traces (good) have a args.data.frame (https://crrev.com/c/3632661)
+    // TODO(compat): remove FallbackTiming handling when we don't care about <m103
+    if (candidates.length && candidates.every(candidate => !candidate.args.data?.frame)) {
       return {
         name: 'FallbackTiming',
         duration: responsivenessEvent.args.data.maxDuration,
@@ -132,7 +134,7 @@ class Responsiveness {
   }
 
   /**
-   * @param {{trace: LH.Trace, settings: Immutable<LH.Config.Settings>}} data
+   * @param {{trace: LH.Trace, settings: LH.Audit.Context['settings']}} data
    * @param {LH.Artifacts.ComputedContext} context
    * @return {Promise<EventTimingEvent|FallbackTimingEvent|null>}
    */
@@ -151,7 +153,8 @@ class Responsiveness {
   }
 }
 
-export default makeComputedArtifact(Responsiveness, [
+const ResponsivenessComputed = makeComputedArtifact(Responsiveness, [
   'trace',
   'settings',
 ]);
+export {ResponsivenessComputed as Responsiveness};

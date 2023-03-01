@@ -4,13 +4,14 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-/** @type {LH.Config.Json} */
+/** @type {LH.Config} */
 const config = {
   extends: 'lighthouse:default',
   settings: {
     onlyAudits: [
       'legacy-javascript',
       'unused-javascript',
+      'redirects',
     ],
   },
 };
@@ -24,7 +25,7 @@ const expectations = {
       /The page may not be loading as expected/,
     ],
     requestedUrl: 'http://localhost:10200/online-only.html?redirect=/redirects-scripts.html',
-    finalUrl: 'http://localhost:10200/redirects-scripts.html',
+    finalDisplayedUrl: 'http://localhost:10200/redirects-scripts.html',
     audits: {
       'unused-javascript': {
         details: {
@@ -51,6 +52,16 @@ const expectations = {
                 ],
               },
             },
+          ],
+        },
+      },
+      'redirects': {
+        numericValue: '>0',
+        details: {
+          items: [
+            // Conservative wastedMs to avoid flakes.
+            {url: /online-only\.html/, wastedMs: '>0'},
+            {url: /redirects-scripts\.html/, wastedMs: 0},
           ],
         },
       },

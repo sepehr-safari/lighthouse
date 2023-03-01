@@ -1,5 +1,6 @@
 {
   "traceEvents": [
+    {"args":{"name":"CrRendererMain"},"cat":"__metadata","name":"thread_name","ph":"M","pid":62078,"tid":775,"ts":0},
     {"args":{"data":{"frameTreeNodeId":10900,"frames":[{"frame":"EDCBA8205B4A80605486AB0A7A3F86B8","name":"","processId":62078,"url":"about:blank"}],"persistentIds":true}},"cat":"disabled-by-default-devtools.timeline","name":"TracingStartedInBrowser","ph":"I","pid":54400,"s":"t","tid":775,"ts":877861744434,"tts":4193625834},
     {"args":{"data":{"type":"beforeunload"}},"cat":"devtools.timeline","dur":9,"name":"EventDispatch","ph":"X","pid":62078,"tdur":10,"tid":775,"ts":877861751184,"tts":1730654},
     {"args":{},"cat":"disabled-by-default-devtools.timeline","dur":4672,"name":"RunTask","ph":"X","pid":62078,"tdur":4637,"tid":775,"ts":877861800667,"tts":1731116},

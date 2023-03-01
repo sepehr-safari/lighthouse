@@ -19,3 +19,4 @@ fi
 yarn install-all
 yarn integration-test
 yarn custom-gatherer-puppeteer-test
+yarn type-checking-test

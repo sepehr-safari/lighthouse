@@ -6,7 +6,7 @@
 
 import pwaDetailsExpectations from './pwa-expectations-details.js';
 
-/** @type {LH.Config.Json} */
+/** @type {LH.Config} */
 const config = {
   extends: 'lighthouse:default',
   settings: {
@@ -21,7 +21,7 @@ const config = {
 const expectations = {
   lhr: {
     requestedUrl: 'https://caltrainschedule.io/',
-    finalUrl: 'https://caltrainschedule.io/',
+    finalDisplayedUrl: 'https://caltrainschedule.io/',
     audits: {
       'service-worker': {
         score: 1,

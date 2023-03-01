@@ -3,12 +3,10 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
-'use strict';
 
 /* global window, document, getNodeDetails */
 
-import FRGatherer from '../../fraggle-rock/gather/base-gatherer.js';
-
+import FRGatherer from '../base-gatherer.js';
 import {axeSource} from '../../lib/axe.js';
 import {pageFunctions} from '../../lib/page-functions.js';
 
@@ -63,10 +61,12 @@ async function runA11yChecks() {
       'frame-focusable-content': {enabled: false},
       'aria-roledescription': {enabled: false},
       'scrollable-region-focusable': {enabled: false},
-      // TODO(paulirish): create audits and enable these 3.
+      // TODO(paulirish): create audits and enable these 5.
       'input-button-name': {enabled: false},
       'role-img-alt': {enabled: false},
       'select-name': {enabled: false},
+      'link-in-text-block': {enabled: false},
+      'frame-title-unique': {enabled: false},
     },
   });
 
@@ -81,6 +81,19 @@ async function runA11yChecks() {
     passes: axeResults.passes.map(result => ({id: result.id})),
     version: axeResults.testEngine.version,
   };
+}
+
+async function runA11yChecksAndResetScroll() {
+  const originalScrollPosition = {
+    x: window.scrollX,
+    y: window.scrollY,
+  };
+
+  try {
+    return await runA11yChecks();
+  } finally {
+    window.scrollTo(originalScrollPosition.x, originalScrollPosition.y);
+  }
 }
 
 /**
@@ -170,13 +183,14 @@ class Accessibility extends FRGatherer {
   getArtifact(passContext) {
     const driver = passContext.driver;
 
-    return driver.executionContext.evaluate(runA11yChecks, {
+    return driver.executionContext.evaluate(runA11yChecksAndResetScroll, {
       args: [],
       useIsolation: true,
       deps: [
         axeSource,
-        pageFunctions.getNodeDetailsString,
+        pageFunctions.getNodeDetails,
         createAxeRuleResultArtifact,
+        runA11yChecks,
       ],
     });
   }

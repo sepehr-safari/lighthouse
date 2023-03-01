@@ -10,6 +10,8 @@
  *   2. Display coords (DC suffix): that match the CSS pixel coordinate space of the LH report's page.
  */
 
+import {Globals} from './report-globals.js';
+
 /** @typedef {import('./dom.js').DOM} DOM */
 /** @typedef {LH.Audit.Details.Rect} Rect */
 /** @typedef {{width: number, height: number}} Size */
@@ -19,13 +21,11 @@
  * @property {DOM} dom
  * @property {Element} rootEl
  * @property {Element} overlayContainerEl
- * @property {LH.Audit.Details.FullPageScreenshot} fullPageScreenshot
+ * @property {LH.Result.FullPageScreenshot} fullPageScreenshot
  */
 
-import {Util} from './util.js';
-
 /**
- * @param {LH.Audit.Details.FullPageScreenshot['screenshot']} screenshot
+ * @param {LH.Result.FullPageScreenshot['screenshot']} screenshot
  * @param {LH.Audit.Details.Rect} rect
  * @return {boolean}
  */
@@ -102,7 +102,7 @@ export class ElementScreenshotRenderer {
    */
   static renderClipPathInScreenshot(dom, maskEl, positionClip, elementRect, elementPreviewSize) {
     const clipPathEl = dom.find('clipPath', maskEl);
-    const clipId = `clip-${Util.getUniqueSuffix()}`;
+    const clipId = `clip-${Globals.getUniqueSuffix()}`;
     clipPathEl.id = clipId;
     maskEl.style.clipPath = `url(#${clipId})`;
 
@@ -131,7 +131,7 @@ export class ElementScreenshotRenderer {
    * Allows for multiple Lighthouse reports to be rendered on the page, each with their
    * own full page screenshot.
    * @param {HTMLElement} el
-   * @param {LH.Audit.Details.FullPageScreenshot['screenshot']} screenshot
+   * @param {LH.Result.FullPageScreenshot['screenshot']} screenshot
    */
   static installFullPageScreenshot(el, screenshot) {
     el.style.setProperty('--element-screenshot-url', `url('${screenshot.data}')`);
@@ -213,7 +213,7 @@ export class ElementScreenshotRenderer {
    * Used to render both the thumbnail preview in details tables and the full-page screenshot in the lightbox.
    * Returns null if element rect is outside screenshot bounds.
    * @param {DOM} dom
-   * @param {LH.Audit.Details.FullPageScreenshot['screenshot']} screenshot
+   * @param {LH.Result.FullPageScreenshot['screenshot']} screenshot
    * @param {Rect} elementRectSC Region of screenshot to highlight.
    * @param {Size} maxRenderSizeDC e.g. maxThumbnailSize or maxLightboxSize.
    * @return {Element|null}
@@ -239,7 +239,10 @@ export class ElementScreenshotRenderer {
       width: maxRenderSizeDC.width / zoomFactor,
       height: maxRenderSizeDC.height / zoomFactor,
     };
+
     elementPreviewSizeSC.width = Math.min(screenshot.width, elementPreviewSizeSC.width);
+    elementPreviewSizeSC.height = Math.min(screenshot.height, elementPreviewSizeSC.height);
+
     /* This preview size is either the size of the thumbnail or size of the Lightbox */
     const elementPreviewSizeDC = {
       width: elementPreviewSizeSC.width * zoomFactor,

@@ -23,17 +23,19 @@
 /** @typedef {LH.FormattedIcu<LH.Audit.Details.Table>} Table */
 /** @typedef {LH.FormattedIcu<LH.Audit.Details.TableItem>} TableItem */
 /** @typedef {LH.FormattedIcu<LH.Audit.Details.ItemValue>} TableItemValue */
+/** @typedef {LH.FormattedIcu<LH.Audit.Details.TableColumnHeading>} TableColumnHeading */
 
-import {Util} from './util.js';
+import {Util} from '../../shared/util.js';
 import {CriticalRequestChainRenderer} from './crc-details-renderer.js';
 import {ElementScreenshotRenderer} from './element-screenshot-renderer.js';
+import {Globals} from './report-globals.js';
 
 const URL_PREFIXES = ['http://', 'https://', 'data:'];
 
 export class DetailsRenderer {
   /**
    * @param {DOM} dom
-   * @param {{fullPageScreenshot?: LH.Audit.Details.FullPageScreenshot}} [options]
+   * @param {{fullPageScreenshot?: LH.Result.FullPageScreenshot}} [options]
    */
   constructor(dom, options = {}) {
     this._dom = dom;
@@ -51,22 +53,20 @@ export class DetailsRenderer {
       case 'list':
         return this._renderList(details);
       case 'table':
+      case 'opportunity':
         return this._renderTable(details);
       case 'criticalrequestchain':
         return CriticalRequestChainRenderer.render(this._dom, details, this);
-      case 'opportunity':
-        return this._renderTable(details);
 
       // Internal-only details, not for rendering.
       case 'screenshot':
       case 'debugdata':
-      case 'full-page-screenshot':
       case 'treemap-data':
         return null;
 
       default: {
-        // @ts-expect-error tsc thinks this is unreachable, but be forward compatible
-        // with new unexpected detail types.
+        // @ts-expect-error - all detail types need to be handled above so tsc thinks this is unreachable.
+        // Call _renderUnknown() to be forward compatible with new, unexpected detail types.
         return this._renderUnknown(details.type, details);
       }
     }
@@ -78,9 +78,9 @@ export class DetailsRenderer {
    */
   _renderBytes(details) {
     // TODO: handle displayUnit once we have something other than 'KiB'
-    const value = Util.i18n.formatBytesToKiB(details.value, details.granularity || 0.1);
+    const value = Globals.i18n.formatBytesToKiB(details.value, details.granularity || 0.1);
     const textEl = this._renderText(value);
-    textEl.title = Util.i18n.formatBytes(details.value);
+    textEl.title = Globals.i18n.formatBytes(details.value);
     return textEl;
   }
 
@@ -91,9 +91,9 @@ export class DetailsRenderer {
   _renderMilliseconds(details) {
     let value;
     if (details.displayUnit === 'duration') {
-      value = Util.i18n.formatDuration(details.value);
+      value = Globals.i18n.formatDuration(details.value);
     } else {
-      value = Util.i18n.formatMilliseconds(details.value, details.granularity || 10);
+      value = Globals.i18n.formatMilliseconds(details.value, details.granularity || 10);
     }
 
     return this._renderText(value);
@@ -172,7 +172,7 @@ export class DetailsRenderer {
    * @return {Element}
    */
   _renderNumeric(details) {
-    const value = Util.i18n.formatNumber(details.value, details.granularity || 0.1);
+    const value = Globals.i18n.formatNumber(details.value, details.granularity || 0.1);
     const element = this._dom.createElement('div', 'lh-numeric');
     element.textContent = value;
     return element;
@@ -213,7 +213,7 @@ export class DetailsRenderer {
    * based on the heading's valueType, unless the value itself has a `type`
    * property to override it.
    * @param {TableItemValue} value
-   * @param {LH.Audit.Details.OpportunityColumnHeading} heading
+   * @param {LH.Audit.Details.TableColumnHeading} heading
    * @return {Element|null}
    */
   _renderTableValue(value, heading) {
@@ -299,72 +299,13 @@ export class DetailsRenderer {
   }
 
   /**
-   * Get the headings of a table-like details object, converted into the
-   * OpportunityColumnHeading type until we have all details use the same
-   * heading format.
-   * @param {Table|OpportunityTable} tableLike
-   * @return {OpportunityTable['headings']}
-   */
-  _getCanonicalizedHeadingsFromTable(tableLike) {
-    if (tableLike.type === 'opportunity') {
-      return tableLike.headings;
-    }
-
-    return tableLike.headings.map(heading => this._getCanonicalizedHeading(heading));
-  }
-
-  /**
-   * Get the headings of a table-like details object, converted into the
-   * OpportunityColumnHeading type until we have all details use the same
-   * heading format.
-   * @param {Table['headings'][number]} heading
-   * @return {OpportunityTable['headings'][number]}
-   */
-  _getCanonicalizedHeading(heading) {
-    let subItemsHeading;
-    if (heading.subItemsHeading) {
-      subItemsHeading = this._getCanonicalizedsubItemsHeading(heading.subItemsHeading, heading);
-    }
-
-    return {
-      key: heading.key,
-      valueType: heading.itemType,
-      subItemsHeading,
-      label: heading.text,
-      displayUnit: heading.displayUnit,
-      granularity: heading.granularity,
-    };
-  }
-
-  /**
-   * @param {Exclude<LH.Audit.Details.TableColumnHeading['subItemsHeading'], undefined>} subItemsHeading
-   * @param {LH.Audit.Details.TableColumnHeading} parentHeading
-   * @return {LH.Audit.Details.OpportunityColumnHeading['subItemsHeading']}
-   */
-  _getCanonicalizedsubItemsHeading(subItemsHeading, parentHeading) {
-    // Low-friction way to prevent committing a falsy key (which is never allowed for
-    // a subItemsHeading) from passing in CI.
-    if (!subItemsHeading.key) {
-      // eslint-disable-next-line no-console
-      console.warn('key should not be null');
-    }
-
-    return {
-      key: subItemsHeading.key || '',
-      valueType: subItemsHeading.itemType || parentHeading.itemType,
-      granularity: subItemsHeading.granularity || parentHeading.granularity,
-      displayUnit: subItemsHeading.displayUnit || parentHeading.displayUnit,
-    };
-  }
-
-  /**
    * Returns a new heading where the values are defined first by `heading.subItemsHeading`,
    * and secondly by `heading`. If there is no subItemsHeading, returns null, which will
    * be rendered as an empty column.
-   * @param {LH.Audit.Details.OpportunityColumnHeading} heading
-   * @return {LH.Audit.Details.OpportunityColumnHeading | null}
+   * @param {LH.Audit.Details.TableColumnHeading} heading
+   * @return {LH.Audit.Details.TableColumnHeading | null}
    */
-  _getDerivedsubItemsHeading(heading) {
+  _getDerivedSubItemsHeading(heading) {
     if (!heading.subItemsHeading) return null;
     return {
       key: heading.subItemsHeading.key || '',
@@ -377,7 +318,7 @@ export class DetailsRenderer {
 
   /**
    * @param {TableItem} item
-   * @param {(LH.Audit.Details.OpportunityColumnHeading | null)[]} headings
+   * @param {(LH.Audit.Details.TableColumnHeading | null)[]} headings
    */
   _renderTableRow(item, headings) {
     const rowElem = this._dom.createElement('tr');
@@ -414,7 +355,7 @@ export class DetailsRenderer {
    * Renders one or more rows from a details table item. A single table item can
    * expand into multiple rows, if there is a subItemsHeading.
    * @param {TableItem} item
-   * @param {LH.Audit.Details.OpportunityColumnHeading[]} headings
+   * @param {LH.Audit.Details.TableColumnHeading[]} headings
    */
   _renderTableRowsFromItem(item, headings) {
     const fragment = this._dom.createFragment();
@@ -422,7 +363,7 @@ export class DetailsRenderer {
 
     if (!item.subItems) return fragment;
 
-    const subItemsHeadings = headings.map(this._getDerivedsubItemsHeading);
+    const subItemsHeadings = headings.map(this._getDerivedSubItemsHeading);
     if (!subItemsHeadings.some(Boolean)) return fragment;
 
     for (const subItem of item.subItems.items) {
@@ -435,7 +376,7 @@ export class DetailsRenderer {
   }
 
   /**
-   * @param {OpportunityTable|Table} details
+   * @param {{headings: TableColumnHeading[], items: TableItem[]}} details
    * @return {Element}
    */
   _renderTable(details) {
@@ -445,9 +386,7 @@ export class DetailsRenderer {
     const theadElem = this._dom.createChildOf(tableElem, 'thead');
     const theadTrElem = this._dom.createChildOf(theadElem, 'tr');
 
-    const headings = this._getCanonicalizedHeadingsFromTable(details);
-
-    for (const heading of headings) {
+    for (const heading of details.headings) {
       const valueType = heading.valueType || 'text';
       const classes = `lh-table-column--${valueType}`;
       const labelEl = this._dom.createElement('div', 'lh-text');
@@ -458,10 +397,23 @@ export class DetailsRenderer {
     const tbodyElem = this._dom.createChildOf(tableElem, 'tbody');
     let even = true;
     for (const item of details.items) {
-      const rowsFragment = this._renderTableRowsFromItem(item, headings);
+      const rowsFragment = this._renderTableRowsFromItem(item, details.headings);
+
+      // The attribute item.entity could be a string (entity-classification), or
+      // a LinkValue for ThirdPartySummary audit.
+      let entityName;
+      if (typeof item.entity === 'object' && item.entity.type === 'link') {
+        entityName = item.entity.text;
+      } else if (typeof item.entity === 'string') {
+        entityName = item.entity;
+      }
+
       for (const rowEl of this._dom.findAll('tr', rowsFragment)) {
         // For zebra styling.
         rowEl.classList.add(even ? 'lh-row--even' : 'lh-row--odd');
+        if (entityName && !rowEl.classList.contains('lh-sub-item-row')) {
+          rowEl.dataset.entity = entityName;
+        }
       }
       even = !even;
       tbodyElem.append(rowsFragment);

@@ -4,7 +4,7 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-/** @type {LH.Config.Json} */
+/** @type {LH.Config} */
 const config = {
   extends: 'lighthouse:default',
   settings: {
@@ -26,7 +26,7 @@ const config = {
 const expectations = {
   lhr: {
     requestedUrl: `http://localhost:10200/online-only.html?delay=1000&redirect_count=3&redirect=%2Fredirects-final.html`,
-    finalUrl: 'http://localhost:10200/redirects-final.html',
+    finalDisplayedUrl: 'http://localhost:10200/redirects-final.html',
     audits: {
       'first-contentful-paint': {
         numericValue: '>=3000',
@@ -40,9 +40,13 @@ const expectations = {
       'redirects': {
         score: '<1',
         details: {
-          items: {
-            length: 4,
-          },
+          items: [
+            // Conservative wastedMs to avoid flakes.
+            {url: /online-only\.html/, wastedMs: '>500'},
+            {url: /online-only\.html/, wastedMs: '>500'},
+            {url: /online-only\.html/, wastedMs: '>500'},
+            {url: /redirects-final\.html/, wastedMs: 0},
+          ],
         },
       },
     },

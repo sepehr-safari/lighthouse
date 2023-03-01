@@ -15,7 +15,7 @@
  * A config with no throttling used for tricky-metrics tests.
  * Those class of tricky metrics need to use observed metrics and DevTools throttling has too many bugs
  * to capture the nuances we're testing.
- * @type {LH.Config.Json}
+ * @type {LH.Config}
  */
 const config = {
   extends: 'lighthouse:default',
@@ -31,7 +31,7 @@ const config = {
 const expectations = {
   lhr: {
     requestedUrl: 'http://localhost:10200/delayed-fcp.html',
-    finalUrl: 'http://localhost:10200/delayed-fcp.html',
+    finalDisplayedUrl: 'http://localhost:10200/delayed-fcp.html',
     audits: {
       'first-contentful-paint': {
         numericValue: '>1', // We just want to check that it doesn't error

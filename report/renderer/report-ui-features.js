@@ -26,8 +26,9 @@ import {ElementScreenshotRenderer} from './element-screenshot-renderer.js';
 import {toggleDarkTheme} from './features-util.js';
 import {openTreemap} from './open-tab.js';
 import {TopbarFeatures} from './topbar-features.js';
-import {Util} from './util.js';
+import {Util} from '../../shared/util.js';
 import {getLhrFilenamePrefix} from '../generator/file-namer.js';
+import {Globals} from './report-globals.js';
 
 /**
  * @param {HTMLTableElement} tableEl
@@ -60,6 +61,7 @@ export class ReportUIFeatures {
    */
   initFeatures(lhr) {
     this.json = lhr;
+    this._fullPageScreenshot = Util.getFullPageScreenshot(lhr);
 
     if (this._topbar) {
       this._topbar.enable(lhr);
@@ -105,7 +107,7 @@ export class ReportUIFeatures {
       this.json.audits['script-treemap-data'] && this.json.audits['script-treemap-data'].details;
     if (showTreemapApp) {
       this.addButton({
-        text: Util.i18n.strings.viewTreemapLabel,
+        text: Globals.strings.viewTreemapLabel,
         icon: 'treemap',
         onClick: () => openTreemap(this.json),
       });
@@ -114,8 +116,8 @@ export class ReportUIFeatures {
     if (this._opts.onViewTrace) {
       this.addButton({
         text: lhr.configSettings.throttlingMethod === 'simulate' ?
-          Util.i18n.strings.viewOriginalTraceLabel :
-          Util.i18n.strings.viewTraceLabel,
+          Globals.strings.viewOriginalTraceLabel :
+          Globals.strings.viewTraceLabel,
         onClick: () => this._opts.onViewTrace?.(),
       });
     }
@@ -126,11 +128,11 @@ export class ReportUIFeatures {
 
     // Fill in all i18n data.
     for (const node of this._dom.findAll('[data-i18n]', this._dom.rootEl)) {
-      // These strings are guaranteed to (at least) have a default English string in Util.UIStrings,
+      // These strings are guaranteed to (at least) have a default English string in UIStrings,
       // so this cannot be undefined as long as `report-ui-features.data-i18n` test passes.
       const i18nKey = node.getAttribute('data-i18n');
-      const i18nAttr = /** @type {keyof typeof Util.i18n.strings} */ (i18nKey);
-      node.textContent = Util.i18n.strings[i18nAttr];
+      const i18nAttr = /** @type {keyof typeof Globals.strings} */ (i18nKey);
+      node.textContent = Globals.strings[i18nAttr];
     }
   }
 
@@ -242,7 +244,9 @@ export class ReportUIFeatures {
 
     tablesWithUrls.forEach((tableEl) => {
       const rowEls = getTableRows(tableEl);
-      const thirdPartyRows = this._getThirdPartyRows(rowEls, this.json.finalUrl);
+      const primaryRowEls = rowEls.filter(rowEl => !rowEl.classList.contains('lh-sub-item-row'));
+      const thirdPartyRowEls = this._getThirdPartyRows(
+        primaryRowEls, Util.getFinalDisplayedUrl(this.json));
 
       // create input box
       const filterTemplate = this._dom.createComponent('3pFilter');
@@ -251,9 +255,9 @@ export class ReportUIFeatures {
       filterInput.addEventListener('change', e => {
         const shouldHideThirdParty = e.target instanceof HTMLInputElement && !e.target.checked;
         let even = true;
-        let rowEl = rowEls[0];
+        let rowEl = primaryRowEls[0];
         while (rowEl) {
-          const shouldHide = shouldHideThirdParty && thirdPartyRows.includes(rowEl);
+          const shouldHide = shouldHideThirdParty && thirdPartyRowEls.includes(rowEl);
 
           // Iterate subsequent associated sub item rows.
           do {
@@ -270,12 +274,12 @@ export class ReportUIFeatures {
       });
 
       this._dom.find('.lh-3p-filter-count', filterTemplate).textContent =
-          `${thirdPartyRows.length}`;
+          `${thirdPartyRowEls.length}`;
       this._dom.find('.lh-3p-ui-string', filterTemplate).textContent =
-          Util.i18n.strings.thirdPartyResourcesLabel;
+          Globals.strings.thirdPartyResourcesLabel;
 
-      const allThirdParty = thirdPartyRows.length === rowEls.length;
-      const allFirstParty = !thirdPartyRows.length;
+      const allThirdParty = thirdPartyRowEls.length === primaryRowEls.length;
+      const allFirstParty = !thirdPartyRowEls.length;
 
       // If all or none of the rows are 3rd party, hide the control.
       if (allThirdParty || allFirstParty) {
@@ -299,18 +303,13 @@ export class ReportUIFeatures {
    * @param {Element} rootEl
    */
   _setupElementScreenshotOverlay(rootEl) {
-    const fullPageScreenshot =
-      this.json.audits['full-page-screenshot'] &&
-      this.json.audits['full-page-screenshot'].details &&
-      this.json.audits['full-page-screenshot'].details.type === 'full-page-screenshot' &&
-      this.json.audits['full-page-screenshot'].details;
-    if (!fullPageScreenshot) return;
+    if (!this._fullPageScreenshot) return;
 
     ElementScreenshotRenderer.installOverlayFeature({
       dom: this._dom,
       rootEl: rootEl,
       overlayContainerEl: rootEl,
-      fullPageScreenshot,
+      fullPageScreenshot: this._fullPageScreenshot,
     });
   }
 
@@ -318,29 +317,33 @@ export class ReportUIFeatures {
    * From a table with URL entries, finds the rows containing third-party URLs
    * and returns them.
    * @param {HTMLElement[]} rowEls
-   * @param {string} finalUrl
+   * @param {string} finalDisplayedUrl
    * @return {Array<HTMLElement>}
    */
-  _getThirdPartyRows(rowEls, finalUrl) {
+  _getThirdPartyRows(rowEls, finalDisplayedUrl) {
+    const finalDisplayedUrlRootDomain = Util.getRootDomain(finalDisplayedUrl);
+    const firstPartyEntityName = this.json.entities?.find(e => e.isFirstParty === true)?.name;
+
     /** @type {Array<HTMLElement>} */
-    const thirdPartyRows = [];
-    const finalUrlRootDomain = Util.getRootDomain(finalUrl);
-
+    const thirdPartyRowEls = [];
     for (const rowEl of rowEls) {
-      if (rowEl.classList.contains('lh-sub-item-row')) continue;
+      if (firstPartyEntityName) {
+        // We rely on entity-classification for new LHRs that support it.
+        if (!rowEl.dataset.entity || rowEl.dataset.entity === firstPartyEntityName) continue;
+      } else {
+        // Without 10.0's entity classification, fallback to the older root domain-based filtering.
+        const urlItem = rowEl.querySelector('div.lh-text__url');
+        if (!urlItem) continue;
+        const datasetUrl = urlItem.dataset.url;
+        if (!datasetUrl) continue;
+        const isThirdParty = Util.getRootDomain(datasetUrl) !== finalDisplayedUrlRootDomain;
+        if (!isThirdParty) continue;
+      }
 
-      const urlItem = rowEl.querySelector('div.lh-text__url');
-      if (!urlItem) continue;
-
-      const datasetUrl = urlItem.dataset.url;
-      if (!datasetUrl) continue;
-      const isThirdParty = Util.getRootDomain(datasetUrl) !== finalUrlRootDomain;
-      if (!isThirdParty) continue;
-
-      thirdPartyRows.push(rowEl);
+      thirdPartyRowEls.push(rowEl);
     }
 
-    return thirdPartyRows;
+    return thirdPartyRowEls;
   }
 
   /**
@@ -348,7 +351,10 @@ export class ReportUIFeatures {
    */
   _saveFile(blob) {
     const ext = blob.type.match('json') ? '.json' : '.html';
-    const filename = getLhrFilenamePrefix(this.json) + ext;
+    const filename = getLhrFilenamePrefix({
+      finalDisplayedUrl: Util.getFinalDisplayedUrl(this.json),
+      fetchTime: this.json.fetchTime,
+    }) + ext;
     if (this._opts.onSaveFileOverride) {
       this._opts.onSaveFileOverride(blob, filename);
     } else {

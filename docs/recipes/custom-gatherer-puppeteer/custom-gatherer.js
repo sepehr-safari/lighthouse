@@ -3,29 +3,19 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
-'use strict';
 
 /* global document */
 
 import {Gatherer} from 'lighthouse';
-import puppeteer from 'puppeteer';
-
-async function connect(driver) {
-  const browser = await puppeteer.connect({
-    browserWSEndpoint: await driver.wsEndpoint(),
-    defaultViewport: null,
-  });
-  const {targetInfo} = await driver.sendCommand('Target.getTargetInfo');
-  const puppeteerTarget = (await browser.targets())
-    .find(target => target._targetId === targetInfo.targetId);
-  const page = await puppeteerTarget.page();
-  return {browser, page, executionContext: driver.executionContext};
-}
 
 class CustomGatherer extends Gatherer {
-  async afterPass(options) {
-    const {driver} = options;
-    const {page, executionContext} = await connect(driver);
+  meta = {
+    supportedModes: ['navigation', 'timespan', 'snapshot'],
+  };
+
+  async getArtifact(context) {
+    const {driver, page} = context;
+    const {executionContext} = driver;
 
     // Inject an input field for our debugging pleasure.
     function makeInput() {
@@ -41,8 +31,6 @@ class CustomGatherer extends Gatherer {
     await page.type('input', '23', {delay: 300});
     const value = await executionContext.evaluateAsync(`document.querySelector('input').value`);
     if (value !== '123') throw new Error('huh?');
-
-    // No need to close the browser or page. Puppeteer doesn't own either of them.
 
     return {value};
   }

@@ -20,32 +20,10 @@ describe('processing for proto', () => {
   });
 
   it('keeps only necessary configSettings', () => {
+    const samplejson = JSON.parse(JSON.stringify(sampleJson));
+    const {configSettings} = samplejson;
     const input = {
-      'configSettings': {
-        'output': [
-          'json',
-        ],
-        'maxWaitForLoad': 45000,
-        'throttlingMethod': 'devtools',
-        'throttling': {
-          'rttMs': 150,
-          'throughputKbps': 1638.4,
-          'requestLatencyMs': 562.5,
-          'downloadThroughputKbps': 1474.5600000000002,
-          'uploadThroughputKbps': 675,
-          'cpuSlowdownMultiplier': 4,
-        },
-        'gatherMode': false,
-        'disableStorageReset': false,
-        'formFactor': 'mobile',
-        'locale': 'en-US',
-        'blockedUrlPatterns': null,
-        'additionalTraceCategories': null,
-        'extraHeaders': null,
-        'onlyAudits': null,
-        'onlyCategories': null,
-        'skipAudits': null,
-      },
+      configSettings,
     };
     const expectation = {
       'configSettings': {
@@ -57,6 +35,27 @@ describe('processing for proto', () => {
     const output = processForProto(input);
 
     expect(output).toMatchObject(expectation);
+    expect(Object.keys(output.configSettings)).toMatchInlineSnapshot(`
+Array [
+  "formFactor",
+  "locale",
+  "onlyCategories",
+  "channel",
+  "throttling",
+  "screenEmulation",
+  "throttlingMethod",
+]
+`);
+    // This must be correctly populated for appropriate report metablock rendering
+    expect(output.configSettings.screenEmulation).toMatchInlineSnapshot(`
+Object {
+  "deviceScaleFactor": 1.75,
+  "disabled": false,
+  "height": 823,
+  "mobile": true,
+  "width": 412,
+}
+`);
   });
 
   it('cleans up default runtimeErrors', () => {

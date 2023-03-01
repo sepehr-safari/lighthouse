@@ -10,12 +10,12 @@
  * May work on older versions of Chrome.
  *
  * To use with locally built DevTools and Lighthouse, run (assuming devtools at ~/src/devtools/devtools-frontend):
- *    yarn devtools
- *    yarn run-devtools --chrome-flags=--custom-devtools-frontend=file://$HOME/src/devtools/devtools-frontend/out/Default/gen/front_end
+ *    DEVTOOLS_PATH=~/src/devtools/devtools-frontend sh core/scripts/build-devtools.sh
+ *    yarn run-devtools --chrome-flags=--custom-devtools-frontend=file://$HOME/src/devtools/devtools-frontend/out/LighthouseIntegration/gen/front_end
  *
  * Or with the DevTools in .tmp:
  *   bash core/test/devtools-tests/setup.sh
- *   yarn run-devtools --chrome-flags=--custom-devtools-frontend=file://$PWD/.tmp/chromium-web-tests/devtools/devtools-frontend/out/Default/gen/front_end
+ *   yarn run-devtools --chrome-flags=--custom-devtools-frontend=file://$PWD/.tmp/chromium-web-tests/devtools/devtools-frontend/out/LighthouseIntegration/gen/front_end
  *
  * URL list file: yarn run-devtools < path/to/urls.txt
  * Single URL: yarn run-devtools "https://example.com"
@@ -25,7 +25,7 @@ import fs from 'fs';
 import readline from 'readline';
 import {fileURLToPath} from 'url';
 
-import puppeteer from 'puppeteer-core';
+import * as puppeteer from 'puppeteer-core';
 import yargs from 'yargs';
 import * as yargsHelpers from 'yargs/helpers';
 import {getChromePath} from 'chrome-launcher';
@@ -69,10 +69,12 @@ const argv = /** @type {Awaited<typeof argv_>} */ (argv_);
 async function evaluateInSession(session, fn, deps) {
   const depsSerialized = deps ? deps.join('\n') : '';
 
-  const expression = `(() => {
-    ${depsSerialized}
-    return (${fn.toString()})();
-  })()`;
+  const expression = typeof fn === 'string' ?
+    fn :
+    `(() => {
+      ${depsSerialized}
+      return (${fn.toString()})();
+    })()`;
   const {result, exceptionDetails} = await session.send('Runtime.evaluate', {
     awaitPromise: true,
     returnByValue: true,
@@ -143,6 +145,10 @@ function addSniffer(receiver, methodName, override) {
 }
 
 async function waitForLighthouseReady() {
+  // Undocking later in the function can cause hiccups when Lighthouse enables device emulation.
+  // @ts-expect-error global
+  UI.dockController.setDockSide('undocked');
+
   // @ts-expect-error global
   const viewManager = UI.viewManager || (UI.ViewManager.ViewManager || UI.ViewManager).instance();
   const views = viewManager.views || viewManager._views;
@@ -153,9 +159,6 @@ async function waitForLighthouseReady() {
   const panel = UI.panels.lighthouse || UI.panels.audits;
   const button = panel.contentElement.querySelector('button');
   if (button.disabled) throw new Error('Start button disabled');
-
-  // @ts-expect-error global
-  UI.dockController.setDockSide('undocked');
 
   // Give the main target model a moment to be available.
   // Otherwise, 'SDK.TargetManager.TargetManager.instance().mainTarget()' is null.
@@ -169,17 +172,24 @@ async function waitForLighthouseReady() {
   }
   // @ts-expect-error global
   const targetManager = SDK.targetManager || (SDK.TargetManager.TargetManager || SDK.TargetManager).instance();
-  if (targetManager.mainTarget() === null) {
+  if (targetManager.primaryPageTarget() === null) {
     if (targetManager?.observeTargets) {
       await new Promise(resolve => targetManager.observeTargets({
         targetAdded: resolve,
         targetRemoved: () => {},
       }));
     } else {
-      while (targetManager.mainTarget() === null) {
+      while (targetManager.primaryPageTarget() === null) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
+  }
+
+  // Ensure the emulation model is ready before Lighthouse starts by enabling device emulation.
+  // @ts-expect-error global
+  const {deviceModeView} = Emulation.AdvancedApp.instance();
+  if (!deviceModeView.isDeviceModeOn()) {
+    deviceModeView.toggleDeviceMode();
   }
 }
 
@@ -233,11 +243,10 @@ function disableLegacyNavigation() {
 /* eslint-enable */
 
 /**
- * @param {puppeteer.Browser} browser
  * @param {puppeteer.CDPSession} inspectorSession
- * @param {LH.Config.Json} config
+ * @param {LH.Config} config
  */
-async function installCustomLighthouseConfig(browser, inspectorSession, config) {
+async function installCustomLighthouseConfig(inspectorSession, config) {
   // Prevent modification for tests that are retried.
   config = JSON.parse(JSON.stringify(config));
 
@@ -251,29 +260,15 @@ async function installCustomLighthouseConfig(browser, inspectorSession, config) 
   if (!config.settings) config.settings = {};
   config.settings.screenEmulation = {disabled: true};
 
-  const workerTarget = await browser.waitForTarget(t => t.url().includes('lighthouse_worker'));
+  // The throttling flag set via the Lighthouse panel will override whatever value is in the config.
+  if (config.settings?.throttlingMethod === 'devtools') {
+    await evaluateInSession(inspectorSession, enableDevToolsThrottling);
+  }
 
-  // Ensure the inspector is paused once the worker is initialized so Lighthouse doesn't start prematurely.
-  await Promise.all([
-    inspectorSession.send('Runtime.enable'),
-    inspectorSession.send('Debugger.enable'),
-  ]);
-  await inspectorSession.send('Debugger.pause');
-
-  const workerSession = await workerTarget.createCDPSession();
-  await Promise.all([
-    workerSession.send('Runtime.enable'),
-    workerSession.send('Debugger.enable'),
-    workerSession.send('Runtime.runIfWaitingForDebugger'),
-    new Promise(resolve => {
-      workerSession.once('Debugger.scriptParsed', resolve);
-    }),
-  ]);
-  await evaluateInSession(workerSession,
-    `self.createConfig = () => (${JSON.stringify(config)})`
+  await evaluateInSession(
+    inspectorSession,
+    `UI.panels.lighthouse.protocolService.configForTesting = ${JSON.stringify(config)}`
   );
-
-  await inspectorSession.send('Debugger.resume');
 }
 
 /**
@@ -293,8 +288,15 @@ async function installConsoleListener(inspectorSession, logs) {
 }
 
 /**
+ * @param {puppeteer.Dialog} dialog
+ */
+function dismissDialog(dialog) {
+  dialog.dismiss();
+}
+
+/**
  * @param {string} url
- * @param {{config?: LH.Config.Json, chromeFlags?: string[], useLegacyNavigation?: boolean}} [options]
+ * @param {{config?: LH.Config, chromeFlags?: string[], useLegacyNavigation?: boolean}} [options]
  * @return {Promise<{lhr: LH.Result, artifacts: LH.Artifacts, logs: string[]}>}
  */
 async function testUrlFromDevtools(url, options = {}) {
@@ -320,37 +322,23 @@ async function testUrlFromDevtools(url, options = {}) {
     const logs = [];
     await installConsoleListener(inspectorSession, logs);
 
+    page.on('dialog', dismissDialog);
+
     await page.goto(url, {waitUntil: ['domcontentloaded']});
 
     await waitForFunction(inspectorSession, waitForLighthouseReady);
+
+    page.off('dialog', dismissDialog);
 
     if (!useLegacyNavigation) {
       await evaluateInSession(inspectorSession, disableLegacyNavigation);
     }
 
-    let configPromise = Promise.resolve();
     if (config) {
-      // Must attach to the Lighthouse worker target and override the `self.createConfig`
-      // function, allowing us to use any config we want.
-      // This needs to be done *before* starting Lighthouse, otherwise the config may not be installed in time.
-      await inspectorSession.send('Target.setAutoAttach', {
-        autoAttach: true,
-        flatten: true,
-        waitForDebuggerOnStart: true,
-      });
-
-      // The throttling flag set via the Lighthouse panel will override whatever value is in the config.
-      if (config.settings?.throttlingMethod === 'devtools') {
-        await evaluateInSession(inspectorSession, enableDevToolsThrottling);
-      }
-
-      configPromise = installCustomLighthouseConfig(browser, inspectorSession, config);
+      await installCustomLighthouseConfig(inspectorSession, config);
     }
 
-    const [result] = await Promise.all([
-      evaluateInSession(inspectorSession, runLighthouse, [addSniffer]),
-      configPromise,
-    ]);
+    const result = await evaluateInSession(inspectorSession, runLighthouse, [addSniffer]);
 
     return {...result, logs};
   } finally {
@@ -379,7 +367,7 @@ async function readUrlList() {
 async function main() {
   const chromeFlags = parseChromeFlags(argv['chromeFlags']);
   const outputDir = argv['output-dir'];
-  /** @type {LH.Config.Json=} */
+  /** @type {LH.Config=} */
   const config = argv.config ? JSON.parse(argv.config) : undefined;
 
   // Create output directory.

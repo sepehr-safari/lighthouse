@@ -31,7 +31,7 @@
  * @property {Run[]} runs
  */
 
-import assert from 'assert';
+import assert from 'assert/strict';
 
 import log from 'lighthouse-logger';
 
@@ -134,16 +134,22 @@ function purpleify(str) {
 }
 
 /**
- * @param {LH.Config.Json=} configJson
- * @return {LH.Config.Json|undefined}
+ * @param {LH.Config=} config
+ * @return {LH.Config|undefined}
  */
-function convertToLegacyConfig(configJson) {
-  if (!configJson) return configJson;
-  if (!configJson.navigations) return configJson;
+function convertToLegacyConfig(config) {
+  if (!config) return config;
 
   return {
-    ...configJson,
-    passes: configJson.navigations.map(nav => ({...nav, passName: nav.id.concat('Pass')})),
+    ...config,
+    passes: [{
+      passName: 'defaultPass',
+      pauseAfterFcpMs: config.settings?.pauseAfterFcpMs,
+      pauseAfterLoadMs: config.settings?.pauseAfterLoadMs,
+      networkQuietThresholdMs: config.settings?.networkQuietThresholdMs,
+      cpuQuietThresholdMs: config.settings?.cpuQuietThresholdMs,
+      blankPage: config.settings?.blankPage,
+    }],
   };
 }
 
@@ -178,17 +184,23 @@ async function runSmokeTest(smokeTestDefn, testOptions) {
       bufferedConsole.log(`  Retrying run (${i} out of ${retries} retries)…`);
     }
 
-    let configJson = smokeTestDefn.config;
+    let config = smokeTestDefn.config;
     if (useLegacyNavigation) {
-      configJson = convertToLegacyConfig(configJson);
+      config = convertToLegacyConfig(config);
     }
 
     // Run Lighthouse.
     try {
       result = {
-        ...await lighthouseRunner(requestedUrl, configJson, {isDebug, useLegacyNavigation}),
+        ...await lighthouseRunner(requestedUrl, config, {isDebug, useLegacyNavigation}),
         networkRequests: takeNetworkRequestUrls ? takeNetworkRequestUrls() : undefined,
       };
+
+      if (!result.lhr?.audits || !result.artifacts) {
+        // Something went really wrong and the runner didn't catch it.
+        throw new Error('lighthouse runner returned a bad result. got lhr:\n' +
+          JSON.stringify(result.lhr, null, 2));
+      }
     } catch (e) {
       // Clear the network requests so that when we retry, we don't see duplicates.
       if (takeNetworkRequestUrls) takeNetworkRequestUrls();

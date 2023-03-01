@@ -4,9 +4,9 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-import {strict as assert} from 'assert';
+import assert from 'assert/strict';
 
-import ViewportMeta from '../../computed/viewport-meta.js';
+import {ViewportMeta} from '../../computed/viewport-meta.js';
 
 describe('ViewportMeta computed artifact', () => {
   const makeMetaElements = viewport => [{name: 'viewport', content: viewport}];
@@ -65,6 +65,12 @@ describe('ViewportMeta computed artifact', () => {
         await ViewportMeta.compute_(makeMetaElements(viewport));
       assert.equal(isMobileOptimized, true);
     }));
+  });
+
+  it('recognizes interactive-widget property', async () => {
+    const viewport = 'width=device-width, interactive-widget=resizes-content';
+    const {parserWarnings} = await ViewportMeta.compute_(makeMetaElements(viewport));
+    assert.equal(parserWarnings[0], undefined);
   });
 
   it('doesn\'t throw when viewport contains "invalid" iOS properties', async () => {

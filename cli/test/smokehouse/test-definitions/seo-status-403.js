@@ -6,7 +6,7 @@
 
 const BASE_URL = 'http://localhost:10200/seo/';
 
-/** @type {LH.Config.Json} */
+/** @type {LH.Config} */
 const config = {
   extends: 'lighthouse:default',
   settings: {
@@ -22,7 +22,7 @@ const expectations = {
   lhr: {
     // Note: most scores are null (audit error) because the page 403ed.
     requestedUrl: BASE_URL + 'seo-failure-cases.html?status_code=403',
-    finalUrl: BASE_URL + 'seo-failure-cases.html?status_code=403',
+    finalDisplayedUrl: BASE_URL + 'seo-failure-cases.html?status_code=403',
     userAgent: /Chrom(e|ium)/, // Ensure we still collect base artifacts when page fails to load.
     runtimeError: {
       code: 'ERRORED_DOCUMENT_REQUEST',

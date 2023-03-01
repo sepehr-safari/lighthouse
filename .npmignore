@@ -9,14 +9,14 @@ coverage/
 proto/
 docs/
 
-core/lib/sd-validation/
 core/scripts/*
-core/test/
 viewer/
 treemap/
 clients/
 cli/results/
 lighthouse-logger/
+**/test/**
+report/test-assets/
 
 # keep a few scripts useful for CI
 !core/scripts/manual-chrome-launcher.js
@@ -25,8 +25,7 @@ lighthouse-logger/
 
 # Exclude the CLI smoketests but keep the smoketest runner that is used
 # by downstream projects (e.g. publisher ads).
-cli/test/*
-!cli/test/smokehouse/
+!cli/test/smokehouse/**
 cli/test/smokehouse/test-definitions/
 
 results/
@@ -62,8 +61,16 @@ dist/**
 changelog.md
 
 # dev files
+.codecov.yml
+.cz-config.js
 .DS_Store
 .editorconfig
 .eslintignore
 .eslintrc.cjs
+.gitattributes
+.mailmap
 *.tgz
+CODE_OF_CONDUCT.md
+eslint-local-rules.cjs
+vercel.json
+yarn.lock

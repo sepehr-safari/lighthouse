@@ -7,23 +7,24 @@
 /* global document */
 
 import fs from 'fs';
-import assert from 'assert';
+import assert from 'assert/strict';
 
 import open from 'open';
 import waitForExpect from 'wait-for-expect';
-import puppeteer from 'puppeteer-core';
+import * as puppeteer from 'puppeteer-core';
 import yargs from 'yargs';
 import {getChromePath} from 'chrome-launcher';
+import log from 'lighthouse-logger';
 
 import {LH_ROOT} from '../../root.js';
-import * as api from '../fraggle-rock/api.js';
+import * as api from '../index.js';
 import * as assetSaver from '../lib/asset-saver.js';
 
-const ARTIFACTS_PATH =
-  `${LH_ROOT}/core/test/fixtures/fraggle-rock/artifacts/sample-flow-artifacts.json`;
-const FLOW_RESULT_PATH =
-  `${LH_ROOT}/core/test/fixtures/fraggle-rock/reports/sample-flow-result.json`;
+/* eslint-disable max-len */
+const ARTIFACTS_PATH = `${LH_ROOT}/core/test/fixtures/fraggle-rock/artifacts/`;
+const FLOW_RESULT_PATH = `${LH_ROOT}/core/test/fixtures/fraggle-rock/reports/sample-flow-result.json`;
 const FLOW_REPORT_PATH = `${LH_ROOT}/dist/sample-reports/flow-report/index.html`;
+/* eslint-enable max-len */
 
 const args = yargs(process.argv.slice(2))
   .options({
@@ -33,6 +34,7 @@ const args = yargs(process.argv.slice(2))
     },
     'rebaseline-artifacts': {
       type: 'array',
+      alias: 'a',
     },
     'output-path': {
       type: 'string',
@@ -41,7 +43,7 @@ const args = yargs(process.argv.slice(2))
   })
   .parseSync();
 
-/** @param {LH.Puppeteer.Page} page */
+/** @param {puppeteer.Page} page */
 async function waitForImagesToLoad(page) {
   const TIMEOUT = 30_000;
   const QUIET_WINDOW = 3_000;
@@ -70,7 +72,7 @@ async function waitForImagesToLoad(page) {
   }, TIMEOUT);
 }
 
-/** @type {LH.Config.Json} */
+/** @type {LH.Config} */
 const config = {
   extends: 'lighthouse:default',
   settings: {
@@ -93,7 +95,7 @@ async function rebaselineArtifacts(artifactKeys) {
 
   await flow.navigate('https://www.mikescerealshack.co');
 
-  await flow.startTimespan({stepName: 'Search input'});
+  await flow.startTimespan({name: 'Search input'});
   await page.type('input', 'call of duty');
   const networkQuietPromise = page.waitForNavigation({waitUntil: ['networkidle0']});
   await page.click('button[type=submit]');
@@ -101,7 +103,7 @@ async function rebaselineArtifacts(artifactKeys) {
   await waitForImagesToLoad(page);
   await flow.endTimespan();
 
-  await flow.snapshot({stepName: 'Search results'});
+  await flow.snapshot({name: 'Search results'});
 
   await flow.navigate('https://www.mikescerealshack.co/corrections');
 
@@ -111,29 +113,40 @@ async function rebaselineArtifacts(artifactKeys) {
 
   // Normalize some data so it doesn't change on every update.
   for (const {artifacts} of flowArtifacts.gatherSteps) {
-    assetSaver.normalizeTimingEntries(artifacts.Timing);
+    const timingCopy = JSON.parse(JSON.stringify(artifacts.Timing));
+    assetSaver.normalizeTimingEntries(timingCopy);
+    artifacts.Timing = timingCopy;
   }
 
   if (artifactKeys.length) {
     const newFlowArtifacts = flowArtifacts;
-    flowArtifacts = JSON.parse(fs.readFileSync(ARTIFACTS_PATH, 'utf-8'));
+    flowArtifacts = assetSaver.loadFlowArtifacts(ARTIFACTS_PATH);
     for (let i = 0; i < flowArtifacts.gatherSteps.length; ++i) {
       const gatherStep = flowArtifacts.gatherSteps[i];
       const newGatherStep = newFlowArtifacts.gatherSteps[i];
+
+      gatherStep.flags = newGatherStep.flags;
+      for (const key of Object.keys(gatherStep)) {
+        if (key in newGatherStep) continue;
+        // @ts-expect-error
+        delete gatherStep[key];
+      }
+
       for (const key of artifactKeys) {
         // @ts-expect-error
         gatherStep.artifacts[key] = newGatherStep.artifacts[key];
       }
-      flowArtifacts.gatherSteps[i] = gatherStep;
     }
   }
 
-  fs.writeFileSync(ARTIFACTS_PATH, JSON.stringify(flowArtifacts, null, 2));
+  await assetSaver.saveFlowArtifacts(flowArtifacts, ARTIFACTS_PATH);
+
+  // Ensure the timing entries from saving the artifacts don't persist into the auditing phase.
+  log.takeTimeEntries();
 }
 
 async function generateFlowResult() {
-  /** @type {LH.UserFlow.FlowArtifacts} */
-  const flowArtifacts = JSON.parse(fs.readFileSync(ARTIFACTS_PATH, 'utf-8'));
+  const flowArtifacts = assetSaver.loadFlowArtifacts(ARTIFACTS_PATH);
   const flowResult = await api.auditFlowArtifacts(flowArtifacts, config);
 
   // Normalize some data so it doesn't change on every update.
@@ -145,7 +158,7 @@ async function generateFlowResult() {
   fs.writeFileSync(args.outputPath, JSON.stringify(flowResult, null, 2));
 
   if (args.view) {
-    const htmlReport = await api.generateFlowReport(flowResult);
+    const htmlReport = await api.generateReport(flowResult);
     fs.writeFileSync(FLOW_REPORT_PATH, htmlReport);
     open(FLOW_REPORT_PATH);
   }

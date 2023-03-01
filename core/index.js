@@ -3,19 +3,22 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
-'use strict';
+
+import log from 'lighthouse-logger';
 
 import {Runner} from './runner.js';
-import log from 'lighthouse-logger';
-import {CriConnection} from './gather/connections/cri.js';
-import {Config} from './config/config.js';
-import URL from './lib/url-shim.js';
-import * as fraggleRock from './fraggle-rock/api.js';
-import {Driver} from './gather/driver.js';
-import {flagsToFRContext} from './config/config-helpers.js';
-import {initializeConfig} from './fraggle-rock/config/config.js';
+import {CriConnection} from './legacy/gather/connections/cri.js';
+import {LegacyResolvedConfig} from './legacy/config/config.js';
+import UrlUtils from './lib/url-utils.js';
+import {Driver} from './legacy/gather/driver.js';
+import {UserFlow, auditGatherSteps} from './user-flow.js';
+import {ReportGenerator} from '../report/generator/report-generator.js';
+import {startTimespanGather} from './gather/timespan-runner.js';
+import {snapshotGather} from './gather/snapshot-runner.js';
+import {navigationGather} from './gather/navigation-runner.js';
+import * as LH from '../types/lh.js';
 
-/** @typedef {import('./gather/connections/connection.js').Connection} Connection */
+/** @typedef {import('./legacy/gather/connections/connection.js').Connection} Connection */
 
 /*
  * The relationship between these root modules:
@@ -35,14 +38,13 @@ import {initializeConfig} from './fraggle-rock/config/config.js';
  * @param {string=} url The URL to test. Optional if running in auditMode.
  * @param {LH.Flags=} flags Optional settings for the Lighthouse run. If present,
  *   they will override any settings in the config.
- * @param {LH.Config.Json=} configJSON Configuration for the Lighthouse run. If
+ * @param {LH.Config=} config Configuration for the Lighthouse run. If
  *   not present, the default config is used.
  * @param {LH.Puppeteer.Page=} page
  * @return {Promise<LH.RunnerResult|undefined>}
  */
-async function lighthouse(url, flags = {}, configJSON, page) {
-  const configContext = flagsToFRContext(flags);
-  return fraggleRock.navigation(url, {page, config: configJSON, configContext});
+async function lighthouse(url, flags = {}, config, page) {
+  return navigation(page, url, {config, flags});
 }
 
 /**
@@ -52,70 +54,119 @@ async function lighthouse(url, flags = {}, configJSON, page) {
  * @param {string=} url The URL to test. Optional if running in auditMode.
  * @param {LH.Flags=} flags Optional settings for the Lighthouse run. If present,
  *   they will override any settings in the config.
- * @param {LH.Config.Json=} configJSON Configuration for the Lighthouse run. If
+ * @param {LH.Config=} config Configuration for the Lighthouse run. If
  *   not present, the default config is used.
  * @param {Connection=} userConnection
  * @return {Promise<LH.RunnerResult|undefined>}
  */
-async function legacyNavigation(url, flags = {}, configJSON, userConnection) {
+async function legacyNavigation(url, flags = {}, config, userConnection) {
   // set logging preferences, assume quiet
   flags.logLevel = flags.logLevel || 'error';
   log.setLevel(flags.logLevel);
 
-  const config = await generateLegacyConfig(configJSON, flags);
+  const resolvedConfig = await LegacyResolvedConfig.fromJson(config, flags);
   const computedCache = new Map();
-  const options = {config, computedCache};
+  const options = {resolvedConfig, computedCache};
   const connection = userConnection || new CriConnection(flags.port, flags.hostname);
 
   // kick off a lighthouse run
   const artifacts = await Runner.gather(() => {
-    const requestedUrl = URL.normalizeUrl(url);
+    const requestedUrl = UrlUtils.normalizeUrl(url);
     return Runner._gatherArtifactsFromBrowser(requestedUrl, options, connection);
   }, options);
   return Runner.audit(artifacts, options);
 }
 
 /**
- * Generate a Lighthouse Config.
- * @param {LH.Config.Json=} configJson Configuration for the Lighthouse run. If
- *   not present, the default config is used.
- * @param {LH.Flags=} flags Optional settings for the Lighthouse run. If present,
- *   they will override any settings in the config.
- * @param {LH.Gatherer.GatherMode=} gatherMode Gather mode used to collect artifacts. If present
- *   the config may override certain settings based on the mode.
- * @return {Promise<LH.Config.FRConfig>}
+ * @param {LH.Puppeteer.Page} page
+ * @param {LH.UserFlow.Options} [options]
  */
-async function generateConfig(configJson, flags = {}, gatherMode = 'navigation') {
-  const configContext = flagsToFRContext(flags);
-  const {config} = await initializeConfig(configJson, {...configContext, gatherMode});
-  return config;
+async function startFlow(page, options) {
+  return new UserFlow(page, options);
 }
 
 /**
- * Generate a legacy Lighthouse Config.
- * @deprecated
- * @param {LH.Config.Json=} configJson Configuration for the Lighthouse run. If
- *   not present, the default config is used.
- * @param {LH.Flags=} flags Optional settings for the Lighthouse run. If present,
- *   they will override any settings in the config.
- * @return {Promise<Config>}
+ * @param {LH.Puppeteer.Page|undefined} page
+ * @param {LH.NavigationRequestor|undefined} requestor
+ * @param {{config?: LH.Config, flags?: LH.Flags}} [options]
+ * @return {Promise<LH.RunnerResult|undefined>}
  */
-function generateLegacyConfig(configJson, flags) {
-  return Config.fromJson(configJson, flags);
+async function navigation(page, requestor, options) {
+  const gatherResult = await navigationGather(page, requestor, options);
+  return Runner.audit(gatherResult.artifacts, gatherResult.runnerOptions);
+}
+
+/**
+ * @param {LH.Puppeteer.Page} page
+ * @param {{config?: LH.Config, flags?: LH.Flags}} [options]
+ * @return {Promise<LH.RunnerResult|undefined>}
+ */
+async function snapshot(page, options) {
+  const gatherResult = await snapshotGather(page, options);
+  return Runner.audit(gatherResult.artifacts, gatherResult.runnerOptions);
+}
+
+/**
+ * @param {LH.Puppeteer.Page} page
+ * @param {{config?: LH.Config, flags?: LH.Flags}} [options]
+ * @return {Promise<{endTimespan: () => Promise<LH.RunnerResult|undefined>}>}
+ */
+async function startTimespan(page, options) {
+  const {endTimespanGather} = await startTimespanGather(page, options);
+  const endTimespan = async () => {
+    const gatherResult = await endTimespanGather();
+    return Runner.audit(gatherResult.artifacts, gatherResult.runnerOptions);
+  };
+  return {endTimespan};
+}
+
+/**
+ * @template {LH.Result|LH.FlowResult} R
+ * @param {R} result
+ * @param {[R] extends [LH.Result] ? LH.OutputMode : Exclude<LH.OutputMode, 'csv'>} [format]
+ * @return {string}
+ */
+function generateReport(result, format = 'html') {
+  const reportOutput = ReportGenerator.generateReport(result, format);
+  if (Array.isArray(reportOutput)) {
+    // In theory the output should never be an array.
+    // This is mostly for type checking.
+    return reportOutput[0];
+  } else {
+    return reportOutput;
+  }
+}
+
+/**
+ * @param {LH.UserFlow.FlowArtifacts} flowArtifacts
+ * @param {LH.Config} [config]
+ */
+async function auditFlowArtifacts(flowArtifacts, config) {
+  const {gatherSteps, name} = flowArtifacts;
+  return await auditGatherSteps(gatherSteps, {name, config});
 }
 
 function getAuditList() {
   return Runner.getAuditList();
 }
 
+const traceCategories = Driver.traceCategories;
+
 export default lighthouse;
 export {Audit} from './audits/audit.js';
-export {default as Gatherer} from './fraggle-rock/gather/base-gatherer.js';
-export {default as NetworkRecords} from './computed/network-records.js';
+export {default as Gatherer} from './gather/base-gatherer.js';
+export {NetworkRecords} from './computed/network-records.js';
+export {default as defaultConfig} from './config/default-config.js';
+export {default as desktopConfig} from './config/desktop-config.js';
+export * from '../types/lh.js';
 export {
   legacyNavigation,
-  generateConfig,
-  generateLegacyConfig,
+  startFlow,
+  navigation,
+  startTimespan,
+  snapshot,
+  generateReport,
+  auditFlowArtifacts,
   getAuditList,
+  traceCategories,
 };
-export const traceCategories = Driver.traceCategories;

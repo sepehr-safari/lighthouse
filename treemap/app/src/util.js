@@ -8,7 +8,7 @@
 
 /** @typedef {HTMLElementTagNameMap & {[id: string]: HTMLElement}} HTMLElementByTagName */
 /** @template {string} T @typedef {import('typed-query-selector/parser').ParseSelector<T, Element>} ParseSelector */
-/** @template T @typedef {import('../../../report/renderer/i18n').I18n<T>} I18n */
+/** @typedef {import('../../../report/renderer/i18n-formatter').I18nFormatter} I18nFormatter */
 
 const UIStrings = {
   /** Label for a button that alternates between showing or hiding a table. */
@@ -30,11 +30,22 @@ const UIStrings = {
 };
 
 class TreemapUtil {
-  /** @type {I18n<typeof TreemapUtil['UIStrings']>} */
+  /** @type {I18nFormatter} */
   // @ts-expect-error: Is set in main.
   static i18n = null;
-
   static UIStrings = UIStrings;
+  static strings = {...UIStrings};
+
+  /**
+   * @param {Record<string, string>} providedStrings
+   */
+  static applyStrings(providedStrings) {
+    this.strings = {
+      // Set missing renderer strings to default (english) values.
+      ...UIStrings,
+      ...providedStrings,
+    };
+  }
 
   /**
    * @param {LH.Treemap.Node} node

@@ -23,7 +23,7 @@ const getResult = scripts => {
   ];
   const artifacts = {
     GatherContext: {gatherMode: 'navigation'},
-    URL: {finalUrl: mainDocumentUrl, requestedUrl: mainDocumentUrl},
+    URL: {finalDisplayedUrl: mainDocumentUrl, requestedUrl: mainDocumentUrl},
     devtoolsLogs: {defaultPass: networkRecordsToDevtoolsLog(networkRecords)},
     Scripts: scripts.map(({url, code}, index) => {
       return {
@@ -115,7 +115,7 @@ describe('LegacyJavaScript audit', () => {
         },
         "totalBytes": 0,
         "url": "https://www.googletagmanager.com/a.js",
-        "wastedBytes": 20104,
+        "wastedBytes": 26896,
       }
     `);
     expect(result.wastedBytesByUrl).toMatchInlineSnapshot(`Map {}`);
@@ -132,7 +132,7 @@ describe('LegacyJavaScript audit', () => {
     expect(result.items[0].subItems.items[0].signal).toEqual('String.prototype.repeat');
     expect(result.wastedBytesByUrl).toMatchInlineSnapshot(`
       Map {
-        "https://www.example.com/a.js" => 20104,
+        "https://www.example.com/a.js" => 26896,
       }
     `);
   });
@@ -140,14 +140,14 @@ describe('LegacyJavaScript audit', () => {
   it('fails code with multiple legacy polyfills', async () => {
     const result = await getResult([
       {
-        code: 'String.prototype.repeat = function() {}; Array.prototype.includes = function() {}',
+        code: 'String.prototype.repeat = function() {}; Array.prototype.forEach = function() {}',
         url: 'https://www.example.com/a.js',
       },
     ]);
     expect(result.items).toHaveLength(1);
     expect(result.items[0].subItems.items).toMatchObject([
       {signal: 'String.prototype.repeat'},
-      {signal: 'Array.prototype.includes'},
+      {signal: 'Array.prototype.forEach'},
     ]);
   });
 

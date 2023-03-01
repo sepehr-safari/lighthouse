@@ -198,13 +198,13 @@ describe('.mergePlugins', () => {
   const configDir = `${LH_ROOT}/core/test/fixtures/config-plugins/`;
 
   it('merge plugins from the config', async () => {
-    const configJson = {
+    const config = {
       audits: ['installable-manifest', 'metrics'],
       plugins: ['lighthouse-plugin-simple'],
     };
 
-    const config = await mergePlugins(configJson, configDir, {});
-    expect(config).toMatchObject({
+    const mergedConfig = await mergePlugins(config, configDir, {});
+    expect(mergedConfig).toMatchObject({
       audits: [
         'installable-manifest',
         'metrics',
@@ -221,33 +221,34 @@ describe('.mergePlugins', () => {
   });
 
   it('merge plugins from flags', async () => {
-    const configJson = {
+    const config = {
       audits: ['installable-manifest', 'metrics'],
       plugins: ['lighthouse-plugin-simple'],
     };
     const flags = {plugins: ['lighthouse-plugin-no-groups']};
-    const config = await mergePlugins(configJson, configDir, flags);
+    const mergedConfig = await mergePlugins(config, configDir, flags);
 
-    expect(config.categories).toHaveProperty('lighthouse-plugin-simple');
-    expect(config.categories).toHaveProperty('lighthouse-plugin-no-groups');
+    expect(mergedConfig.categories).toHaveProperty('lighthouse-plugin-simple');
+    expect(mergedConfig.categories).toHaveProperty('lighthouse-plugin-no-groups');
   });
 
-  it('validate plugin name', () => {
-    const configJson = {audits: ['installable-manifest', 'metrics']};
+  it('validate plugin name', async () => {
+    const config = {audits: ['installable-manifest', 'metrics']};
     const flags = {plugins: ['not-a-plugin']};
-    expect(mergePlugins(configJson, configDir, flags)).rejects.toThrow(/does not start/);
+    await expect(mergePlugins(config, configDir, flags)).rejects.toThrow(/does not start/);
   });
 
-  it('validate plugin existence', () => {
-    const configJson = {audits: ['installable-manifest', 'metrics']};
+  it('validate plugin existence', async () => {
+    const config = {audits: ['installable-manifest', 'metrics']};
     const flags = {plugins: ['lighthouse-plugin-missing']};
-    expect(mergePlugins(configJson, configDir, flags)).rejects.toThrow(/Unable to locate plugin/);
+    await expect(mergePlugins(config, configDir, flags)).rejects
+      .toThrow(/Unable to locate plugin/);
   });
 
-  it('validate plugin structure', () => {
-    const configJson = {audits: ['installable-manifest', 'metrics']};
+  it('validate plugin structure', async () => {
+    const config = {audits: ['installable-manifest', 'metrics']};
     const flags = {plugins: ['lighthouse-plugin-no-category']};
-    expect(mergePlugins(configJson, configDir, flags)).rejects.toThrow(/no valid category/);
+    await expect(mergePlugins(config, configDir, flags)).rejects.toThrow(/no valid category/);
   });
 });
 
@@ -367,8 +368,8 @@ describe('.resolveGathererToDefn', () => {
     });
   });
 
-  it('throws for invalid gathererDefn', () => {
-    expect(resolveGathererToDefn({})).rejects.toThrow(/Invalid Gatherer type/);
+  it('throws for invalid gathererDefn', async () => {
+    await expect(resolveGathererToDefn({})).rejects.toThrow(/Invalid Gatherer type/);
   });
 });
 
@@ -407,8 +408,8 @@ describe('.resolveAuditsToDefns', () => {
     ]);
   });
 
-  it('throws for invalid auditDefns', () => {
-    expect(resolveAuditsToDefns([new Gatherer()])).rejects.toThrow(/Invalid Audit type/);
+  it('throws for invalid auditDefns', async () => {
+    await expect(resolveAuditsToDefns([new Gatherer()])).rejects.toThrow(/Invalid Audit type/);
   });
 });
 

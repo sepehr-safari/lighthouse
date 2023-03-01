@@ -1,6 +1,6 @@
 all-legacy-polyfills
-  98346        all-legacy-polyfills-core-js-3/main.bundle.min.js
-  51364        all-legacy-polyfills-core-js-2/main.bundle.min.js
+  101744       all-legacy-polyfills-core-js-3/main.bundle.min.js
+   50853       all-legacy-polyfills-core-js-2/main.bundle.min.js
 
 core-js-2-only-polyfill
   14974        es6-reflect-construct/main.bundle.min.js
@@ -18,7 +18,6 @@ core-js-2-only-polyfill
   11253        es6-reflect-own-keys/main.bundle.min.js
   11240        es6-object-define-properties/main.bundle.min.js
   10456        es6-reflect-get/main.bundle.min.js
-  10417        es7-array-includes/main.bundle.min.js
    9934        es6-reflect-set-prototype-of/main.bundle.min.js
    9820        es6-array-fill/main.bundle.min.js
    9776        es6-object-set-prototype-of/main.bundle.min.js
@@ -53,67 +52,66 @@ core-js-2-only-polyfill
    3504        es6-function-name/main.bundle.min.js
 
 core-js-2-preset-env-esmodules
-  179558       false/main.bundle.min.js
-   64435       true/main.bundle.min.js
-   63754       true-and-bugfixes/main.bundle.min.js
+  191667       false/main.bundle.min.js
+   64901       true/main.bundle.min.js
+   64221       true-and-bugfixes/main.bundle.min.js
 
 core-js-3-only-polyfill
-  40653        es-array-find-index/main.bundle.min.js
-  40587        es-array-find/main.bundle.min.js
-  40016        es-reflect-construct/main.bundle.min.js
-  39609        es-array-from/main.bundle.min.js
-  37047        es-array-filter/main.bundle.min.js
-  37023        es-array-map/main.bundle.min.js
-  36920        es-array-for-each/main.bundle.min.js
-  36702        es-array-some/main.bundle.min.js
-  35250        es-date-to-iso-string/main.bundle.min.js
-  35116        es-object-prevent-extensions/main.bundle.min.js
-  35015        es-object-freeze/main.bundle.min.js
-  34997        es-object-seal/main.bundle.min.js
-  34914        es-array-fill/main.bundle.min.js
-  34354        es-array-includes/main.bundle.min.js
-  33898        es-array-of/main.bundle.min.js
-  32875        es-string-code-point-at/main.bundle.min.js
-  32421        es-reflect-get/main.bundle.min.js
-  32407        es-string-raw/main.bundle.min.js
-  32346        es-string-repeat/main.bundle.min.js
-  31727        es-object-get-prototype-of/main.bundle.min.js
-  31596        es-reflect-set-prototype-of/main.bundle.min.js
-  31577        es-reflect-get-prototype-of/main.bundle.min.js
-  31447        es-object-get-own-property-descriptors/main.bundle.min.js
-  31370        es-object-entries/main.bundle.min.js
-  31363        es-object-values/main.bundle.min.js
-  31310        es-object-define-properties/main.bundle.min.js
-  31238        es-object-set-prototype-of/main.bundle.min.js
-  31216        es-reflect-is-extensible/main.bundle.min.js
-  31119        es-object-is-extensible/main.bundle.min.js
-  30860        es-object-is-sealed/main.bundle.min.js
-  30860        es-object-is-frozen/main.bundle.min.js
-  30780        es-string-from-code-point/main.bundle.min.js
-  30772        es-reflect-apply/main.bundle.min.js
-  30762        es-reflect-define-property/main.bundle.min.js
-  30626        es-reflect-prevent-extensions/main.bundle.min.js
-  30592        es-object-keys/main.bundle.min.js
-  30441        es-date-to-json/main.bundle.min.js
-  30428        es-reflect-get-own-property-descriptor/main.bundle.min.js
-  30402        es-number-is-safe-integer/main.bundle.min.js
-  30358        es-reflect-delete-property/main.bundle.min.js
-  30293        es-number-is-integer/main.bundle.min.js
-  30213        es-object-define-property/main.bundle.min.js
-  30212        es-array-is-array/main.bundle.min.js
-  30184        es-date-now/main.bundle.min.js
-  30008        es-reflect-own-keys/main.bundle.min.js
-  29977        es-reflect-has/main.bundle.min.js
-  20464        es-date-to-string/main.bundle.min.js
-  14848        es-function-name/main.bundle.min.js
+  44348        es-array-find-index/main.bundle.min.js
+  44282        es-array-find/main.bundle.min.js
+  43410        es-reflect-construct/main.bundle.min.js
+  43207        es-array-from/main.bundle.min.js
+  40601        es-array-filter/main.bundle.min.js
+  40577        es-array-map/main.bundle.min.js
+  40475        es-array-for-each/main.bundle.min.js
+  40257        es-array-some/main.bundle.min.js
+  39382        es-object-prevent-extensions/main.bundle.min.js
+  39281        es-object-freeze/main.bundle.min.js
+  39263        es-object-seal/main.bundle.min.js
+  38238        es-array-fill/main.bundle.min.js
+  38197        es-date-to-iso-string/main.bundle.min.js
+  37026        es-array-of/main.bundle.min.js
+  35918        es-string-code-point-at/main.bundle.min.js
+  35538        es-reflect-get/main.bundle.min.js
+  35466        es-string-raw/main.bundle.min.js
+  35317        es-string-repeat/main.bundle.min.js
+  34844        es-object-get-prototype-of/main.bundle.min.js
+  34706        es-reflect-set-prototype-of/main.bundle.min.js
+  34694        es-reflect-get-prototype-of/main.bundle.min.js
+  34668        es-object-define-properties/main.bundle.min.js
+  34635        es-object-get-own-property-descriptors/main.bundle.min.js
+  34556        es-object-entries/main.bundle.min.js
+  34549        es-object-values/main.bundle.min.js
+  34403        es-reflect-is-extensible/main.bundle.min.js
+  34348        es-object-set-prototype-of/main.bundle.min.js
+  34306        es-object-is-extensible/main.bundle.min.js
+  34031        es-reflect-apply/main.bundle.min.js
+  34021        es-object-is-sealed/main.bundle.min.js
+  34021        es-object-is-frozen/main.bundle.min.js
+  33948        es-reflect-define-property/main.bundle.min.js
+  33901        es-string-from-code-point/main.bundle.min.js
+  33811        es-reflect-prevent-extensions/main.bundle.min.js
+  33777        es-object-keys/main.bundle.min.js
+  33634        es-date-to-json/main.bundle.min.js
+  33614        es-reflect-get-own-property-descriptor/main.bundle.min.js
+  33587        es-number-is-safe-integer/main.bundle.min.js
+  33543        es-reflect-delete-property/main.bundle.min.js
+  33478        es-number-is-integer/main.bundle.min.js
+  33401        es-object-define-property/main.bundle.min.js
+  33397        es-array-is-array/main.bundle.min.js
+  33310        es-date-now/main.bundle.min.js
+  33193        es-reflect-own-keys/main.bundle.min.js
+  33162        es-reflect-has/main.bundle.min.js
+  23452        es-date-to-string/main.bundle.min.js
+  16749        es-function-name/main.bundle.min.js
 
 core-js-3-preset-env-esmodules
-  471217       false/main.bundle.min.js
-  356739       true/main.bundle.min.js
-  356058       true-and-bugfixes/main.bundle.min.js
+  524952       false/main.bundle.min.js
+  393404       true/main.bundle.min.js
+  392724       true-and-bugfixes/main.bundle.min.js
 
 only-plugin
-  1809         -babel-plugin-transform-spread/main.bundle.min.js
-  1710         -babel-plugin-transform-regenerator-babel-transform-async-to-generator/main.bundle.min.js
-  1073         -babel-plugin-transform-regenerator/main.bundle.min.js
-   895         -babel-plugin-transform-classes/main.bundle.min.js
+  12390        -babel-plugin-transform-regenerator-babel-transform-async-to-generator/main.bundle.min.js
+  11759        -babel-plugin-transform-regenerator/main.bundle.min.js
+   1918        -babel-plugin-transform-classes/main.bundle.min.js
+   1809        -babel-plugin-transform-spread/main.bundle.min.js

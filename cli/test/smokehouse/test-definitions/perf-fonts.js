@@ -4,7 +4,7 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-/** @type {LH.Config.Json} */
+/** @type {LH.Config} */
 const config = {
   extends: 'lighthouse:default',
   settings: {
@@ -12,6 +12,10 @@ const config = {
     // preload-fonts isn't a performance audit, but can easily leverage the font
     // webpages present here, hence the inclusion of 'best-practices'.
     onlyCategories: ['performance', 'best-practices'],
+
+    // BF cache will request the page again, initiating additional network requests.
+    // Disable the audit so we only detect requests from the normal page load.
+    skipAudits: ['bf-cache'],
 
     // A mixture of under, over, and meeting budget to exercise all paths.
     budgets: [{
@@ -60,7 +64,7 @@ const expectations = {
   },
   lhr: {
     requestedUrl: 'http://localhost:10200/perf/fonts.html',
-    finalUrl: 'http://localhost:10200/perf/fonts.html',
+    finalDisplayedUrl: 'http://localhost:10200/perf/fonts.html',
     audits: {
       'font-display': {
         score: 0,

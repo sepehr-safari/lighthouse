@@ -4,7 +4,7 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-/** @type {LH.Config.Json} */
+/** @type {LH.Config} */
 const config = {
   extends: 'lighthouse:default',
   settings: {
@@ -19,7 +19,7 @@ const config = {
 const expectations = {
   lhr: {
     requestedUrl: 'http://localhost:10200/byte-efficiency/gzip.html',
-    finalUrl: 'http://localhost:10200/byte-efficiency/gzip.html',
+    finalDisplayedUrl: 'http://localhost:10200/byte-efficiency/gzip.html',
     audits: {
       'network-requests': {
         details: {

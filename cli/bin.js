@@ -27,11 +27,9 @@ import * as commands from './commands/commands.js';
 import * as Printer from './printer.js';
 import {getFlags} from './cli-flags.js';
 import {runLighthouse} from './run.js';
-import {generateConfig, generateLegacyConfig} from '../core/index.js';
 import {askPermission} from './sentry-prompt.js';
 import {LH_ROOT} from '../root.js';
 import {Sentry} from '../core/lib/sentry.js';
-import {getConfigDisplayString} from '../core/fraggle-rock/config/config.js';
 
 const pkg = JSON.parse(fs.readFileSync(LH_ROOT + '/package.json', 'utf-8'));
 
@@ -65,20 +63,20 @@ async function begin() {
 
   const urlUnderTest = cliFlags._[0];
 
-  /** @type {LH.Config.Json|undefined} */
-  let configJson;
+  /** @type {LH.Config|undefined} */
+  let config;
   if (cliFlags.configPath) {
     // Resolve the config file path relative to where cli was called.
     cliFlags.configPath = path.resolve(process.cwd(), cliFlags.configPath);
 
     if (cliFlags.configPath.endsWith('.json')) {
-      configJson = JSON.parse(fs.readFileSync(cliFlags.configPath, 'utf-8'));
+      config = JSON.parse(fs.readFileSync(cliFlags.configPath, 'utf-8'));
     } else {
       const configModuleUrl = url.pathToFileURL(cliFlags.configPath).href;
-      configJson = (await import(configModuleUrl)).default;
+      config = (await import(configModuleUrl)).default;
     }
   } else if (cliFlags.preset) {
-    configJson = (await import(`../core/config/${cliFlags.preset}-config.js`)).default;
+    config = (await import(`../core/config/${cliFlags.preset}-config.js`)).default;
   }
 
   if (cliFlags.budgetPath) {
@@ -116,17 +114,6 @@ async function begin() {
     cliFlags.precomputedLanternData = data;
   }
 
-  if (cliFlags.printConfig) {
-    if (cliFlags.legacyNavigation) {
-      const config = await generateLegacyConfig(configJson, cliFlags);
-      process.stdout.write(config.getPrintString());
-    } else {
-      const config = await generateConfig(configJson, cliFlags);
-      process.stdout.write(getConfigDisplayString(config));
-    }
-    return;
-  }
-
   // By default, cliFlags.enableErrorReporting is undefined so the user is
   // prompted. This can be overriden with an explicit flag or by the cached
   // answer returned by askPermission().
@@ -145,7 +132,7 @@ async function begin() {
     });
   }
 
-  return runLighthouse(urlUnderTest, cliFlags, configJson);
+  return runLighthouse(urlUnderTest, cliFlags, config);
 }
 
 export {

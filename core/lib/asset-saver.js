@@ -3,32 +3,35 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
-'use strict';
 
 import fs from 'fs';
 import path from 'path';
-import log from 'lighthouse-logger';
 import stream from 'stream';
 import util from 'util';
+
+import log from 'lighthouse-logger';
+
 import {Simulator} from './dependency-graph/simulator/simulator.js';
 import lanternTraceSaver from './lantern-trace-saver.js';
-import {Metrics} from './traces/pwmetrics-events.js';
-import NetworkAnalysisComputed from '../computed/network-analysis.js';
-import LoadSimulatorComputed from '../computed/load-simulator.js';
+import {MetricTraceEvents} from './traces/metric-trace-events.js';
+import {NetworkAnalysis} from '../computed/network-analysis.js';
+import {LoadSimulator} from '../computed/load-simulator.js';
 import {LighthouseError} from '../lib/lh-error.js';
 
 const {promisify} = util;
 
-// TODO(esmodules): Rollup does not support `promisfy` or `stream.pipeline`. Bundled files
+// Rollup does not support `promisfy` or `stream.pipeline`. Bundled files
 // don't need anything in this file except for `stringifyReplacer`, so a check for
 // truthiness before using is enough.
 // TODO: Can remove promisify(pipeline) in Node 15.
 // https://nodejs.org/api/stream.html#streams-promises-api
 const pipeline = promisify && promisify(stream.pipeline);
 
+const optionsFilename = 'options.json';
 const artifactsFilename = 'artifacts.json';
 const traceSuffix = '.trace.json';
 const devtoolsLogSuffix = '.devtoolslog.json';
+const stepDirectoryRegex = /^step(\d+)$/;
 
 /**
  * @typedef {object} PreparedAssets
@@ -64,6 +67,9 @@ function loadArtifacts(basePath) {
     const passName = filename.replace(devtoolsLogSuffix, '');
     const devtoolsLog = JSON.parse(fs.readFileSync(path.join(basePath, filename), 'utf8'));
     artifacts.devtoolsLogs[passName] = devtoolsLog;
+    if (passName === 'defaultPass') {
+      artifacts.DevtoolsLog = devtoolsLog;
+    }
   });
 
   // load traces
@@ -73,6 +79,9 @@ function loadArtifacts(basePath) {
     const trace = JSON.parse(file);
     const passName = filename.replace(traceSuffix, '');
     artifacts.traces[passName] = Array.isArray(trace) ? {traceEvents: trace} : trace;
+    if (passName === 'defaultPass') {
+      artifacts.Trace = artifacts.traces[passName];
+    }
   });
 
   if (Array.isArray(artifacts.Timing)) {
@@ -81,6 +90,52 @@ function loadArtifacts(basePath) {
     artifacts.Timing.forEach(entry => (entry.gather = true));
   }
   return artifacts;
+}
+
+/**
+ * @param {string} basePath
+ * @return {LH.UserFlow.FlowArtifacts}
+ */
+function loadFlowArtifacts(basePath) {
+  log.log('Reading flow artifacts from disk:', basePath);
+
+  if (!fs.existsSync(basePath)) {
+    throw new Error('No saved flow artifacts found at ' + basePath);
+  }
+
+  /** @type {LH.UserFlow.FlowArtifacts} */
+  const flowArtifacts = JSON.parse(
+    fs.readFileSync(path.join(basePath, optionsFilename), 'utf-8')
+  );
+
+  const filenames = fs.readdirSync(basePath);
+
+  flowArtifacts.gatherSteps = [];
+  for (const filename of filenames) {
+    const regexResult = stepDirectoryRegex.exec(filename);
+    if (!regexResult) continue;
+
+    const index = Number(regexResult[1]);
+    if (!Number.isFinite(index)) continue;
+
+    const stepPath = path.join(basePath, filename);
+    if (!fs.lstatSync(stepPath).isDirectory()) continue;
+
+    /** @type {LH.UserFlow.GatherStep} */
+    const gatherStep = JSON.parse(
+      fs.readFileSync(path.join(stepPath, optionsFilename), 'utf-8')
+    );
+    gatherStep.artifacts = loadArtifacts(stepPath);
+
+    flowArtifacts.gatherSteps[index] = gatherStep;
+  }
+
+  const missingStepIndex = flowArtifacts.gatherSteps.findIndex(gatherStep => !gatherStep);
+  if (missingStepIndex !== -1) {
+    throw new Error(`Could not find step with index ${missingStepIndex} at ${basePath}`);
+  }
+
+  return flowArtifacts;
 }
 
 /**
@@ -96,6 +151,54 @@ function stringifyReplacer(key, value) {
   }
 
   return value;
+}
+
+/**
+ * Saves flow artifacts with the following file structure:
+ *   flow/                             --  Directory specified by `basePath`.
+ *     options.json                    --  Flow options (e.g. flow name, flags).
+ *     step0/                          --  Directory containing artifacts for the first step.
+ *       options.json                  --  First step's options (e.g. step flags).
+ *       artifacts.json                --  First step's artifacts except the DevTools log and trace.
+ *       defaultPass.devtoolslog.json  --  First step's DevTools log.
+ *       defaultPass.trace.json        --  First step's trace.
+ *     step1/                          --  Directory containing artifacts for the second step.
+ *
+ * @param {LH.UserFlow.FlowArtifacts} flowArtifacts
+ * @param {string} basePath
+ * @return {Promise<void>}
+ */
+async function saveFlowArtifacts(flowArtifacts, basePath) {
+  const status = {msg: 'Saving flow artifacts', id: 'lh:assetSaver:saveArtifacts'};
+  log.time(status);
+  fs.mkdirSync(basePath, {recursive: true});
+
+  // Delete any previous artifacts in this directory.
+  const filenames = fs.readdirSync(basePath);
+  for (const filename of filenames) {
+    if (stepDirectoryRegex.test(filename) || filename === optionsFilename) {
+      fs.rmSync(`${basePath}/${filename}`, {recursive: true});
+    }
+  }
+
+  const {gatherSteps, ...flowOptions} = flowArtifacts;
+  for (let i = 0; i < gatherSteps.length; ++i) {
+    const {artifacts, ...stepOptions} = gatherSteps[i];
+    const stepPath = path.join(basePath, `step${i}`);
+    await saveArtifacts(artifacts, stepPath);
+    fs.writeFileSync(
+      path.join(stepPath, optionsFilename),
+      JSON.stringify(stepOptions, stringifyReplacer, 2) + '\n'
+    );
+  }
+
+  fs.writeFileSync(
+    path.join(basePath, optionsFilename),
+    JSON.stringify(flowOptions, stringifyReplacer, 2) + '\n'
+  );
+
+  log.log('Flow artifacts saved to disk in folder:', basePath);
+  log.timeEnd(status);
 }
 
 /**
@@ -119,7 +222,10 @@ async function saveArtifacts(artifacts, basePath) {
     }
   }
 
-  const {traces, devtoolsLogs, ...restArtifacts} = artifacts;
+  // `DevtoolsLog` and `Trace` will always be the 'defaultPass' version.
+  // We don't need to save them twice, so extract them here.
+  // eslint-disable-next-line no-unused-vars
+  const {traces, devtoolsLogs, DevtoolsLog, Trace, ...restArtifacts} = artifacts;
 
   // save traces
   for (const [passName, trace] of Object.entries(traces)) {
@@ -164,7 +270,7 @@ async function prepareAssets(artifacts, audits) {
 
     const traceData = Object.assign({}, trace);
     if (audits) {
-      const evts = new Metrics(traceData.traceEvents, audits).generateFakeEvents();
+      const evts = new MetricTraceEvents(traceData.traceEvents, audits).generateFakeEvents();
       traceData.traceEvents = traceData.traceEvents.concat(evts);
     }
 
@@ -309,8 +415,8 @@ async function saveLanternNetworkData(devtoolsLog, outputPath) {
   /** @type {LH.Audit.Context} */
   // @ts-expect-error - the full audit context isn't needed for analysis.
   const context = {computedCache: new Map()};
-  const networkAnalysis = await NetworkAnalysisComputed.request(devtoolsLog, context);
-  const lanternData = LoadSimulatorComputed.convertAnalysisToSaveableLanternData(networkAnalysis);
+  const networkAnalysis = await NetworkAnalysis.request(devtoolsLog, context);
+  const lanternData = LoadSimulator.convertAnalysisToSaveableLanternData(networkAnalysis);
 
   fs.writeFileSync(outputPath, JSON.stringify(lanternData));
 }
@@ -331,8 +437,10 @@ function normalizeTimingEntries(timings) {
 
 export {
   saveArtifacts,
+  saveFlowArtifacts,
   saveLhr,
   loadArtifacts,
+  loadFlowArtifacts,
   saveAssets,
   prepareAssets,
   saveTrace,

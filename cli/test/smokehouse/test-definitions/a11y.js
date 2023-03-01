@@ -6,7 +6,7 @@
 
 /**
  * Config for running PWA smokehouse audits for axe.
- * @type {LH.Config.Json}
+ * @type {LH.Config}
  */
 const config = {
   extends: 'lighthouse:default',
@@ -24,7 +24,7 @@ const config = {
 const expectations = {
   lhr: {
     requestedUrl: 'http://localhost:10200/a11y/a11y_tester.html',
-    finalUrl: 'http://localhost:10200/a11y/a11y_tester.html',
+    finalDisplayedUrl: 'http://localhost:10200/a11y/a11y_tester.html',
     audits: {
       'aria-allowed-attr': {
         score: 0,
@@ -198,9 +198,9 @@ const expectations = {
               node: {
                 'type': 'node',
                 'selector': 'body > section > div#aria-required-children',
-                'snippet': '<div id="aria-required-children" role="radiogroup">',
-                'explanation': 'Fix any of the following:\n  Required ARIA child role not present: radio',
-                'nodeLabel': 'body > section > div#aria-required-children',
+                'snippet': '<div id="aria-required-children" role="list">',
+                'explanation': 'Fix any of the following:\n  Required ARIA child role not present: listitem\n  Element has no aria-busy="true" attribute',
+                'nodeLabel': 'Item',
               },
             },
           ],
@@ -331,12 +331,8 @@ const expectations = {
         },
       },
       'bypass': {
-        score: 1,
-        details: {
-          type: 'table',
-          headings: [],
-          items: [],
-        },
+        score: null,
+        scoreDisplayMode: 'notApplicable',
       },
       'color-contrast': {
         score: 0,
@@ -364,7 +360,7 @@ const expectations = {
                 'type': 'node',
                 'selector': 'body > section > dl#definition-list',
                 'snippet': '<dl id="definition-list">',
-                'explanation': 'Fix all of the following:\n  List element has direct children that are not allowed inside <dt> or <dd> elements',
+                'explanation': 'Fix all of the following:\n  dl element has direct children that are not allowed: p',
                 'nodeLabel': 'body > section > dl#definition-list',
               },
             },
@@ -631,7 +627,7 @@ const expectations = {
                 'type': 'node',
                 'selector': 'body > section > ul#list',
                 'snippet': '<ul id="list">',
-                'explanation': 'Fix all of the following:\n  List element has direct children that are not allowed inside <li> elements',
+                'explanation': 'Fix all of the following:\n  List element has direct children that are not allowed: p',
                 'nodeLabel': 'body > section > ul#list',
               },
             },
@@ -678,7 +674,7 @@ const expectations = {
               node: {
                 'type': 'node',
                 'selector': 'body > section > object#object-alt',
-                'snippet': '<object id="object-alt">',
+                'snippet': '<object id="object-alt" data="data:text/html,data">',
                 'explanation': 'Fix any of the following:\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute\n  Element\'s default semantics were not overridden with role="none" or role="presentation"',
                 'nodeLabel': 'body > section > object#object-alt',
               },

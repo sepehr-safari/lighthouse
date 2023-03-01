@@ -4,7 +4,7 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-import ProcessedTrace from '../../computed/processed-trace.js';
+import {ProcessedTrace} from '../../computed/processed-trace.js';
 import {readJson} from '../test-utils.js';
 
 const pwaTrace = readJson('../fixtures/traces/progressive-app-m60.json', import.meta);
@@ -21,12 +21,12 @@ describe('ProcessedTrace', () => {
     delete processedTrace.mainThreadEvents;
     delete processedTrace.frameTreeEvents;
     delete processedTrace.frameEvents;
+    delete processedTrace._keyEvents;
 
-    expect(processedTrace).toEqual({
-      mainFrameIds: {
+    expect(processedTrace).toMatchObject({
+      mainFrameInfo: {
         frameId: '0x25a638821e30',
-        pid: 44277,
-        tid: 775,
+        startingPid: 44277,
       },
       timeOriginEvt: {
         args: {

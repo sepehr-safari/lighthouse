@@ -6,7 +6,7 @@
 
 /**
  * Config file for sites with various errors, just fail out quickly.
- * @type {LH.Config.Json}
+ * @type {LH.Config}
  */
 const config = {
   extends: 'lighthouse:default',
@@ -35,7 +35,7 @@ const expectations = {
     // that has a bad iframe to make sure LH audits successfully.
     // https://github.com/GoogleChrome/lighthouse/issues/9562
     requestedUrl: 'http://localhost:10200/badssl-iframe.html',
-    finalUrl: 'http://localhost:10200/badssl-iframe.html',
+    finalDisplayedUrl: 'http://localhost:10200/badssl-iframe.html',
     audits: {
       'first-contentful-paint': {
         scoreDisplayMode: 'numeric',

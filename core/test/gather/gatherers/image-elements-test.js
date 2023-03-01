@@ -9,14 +9,12 @@ import jestMock from 'jest-mock';
 import ImageElements from '../../../gather/gatherers/image-elements.js';
 import {NetworkRecorder} from '../../../lib/network-recorder.js';
 import {createMockContext, createMockDriver, createMockSession} from
-  '../../fraggle-rock/gather/mock-driver.js';
+  '../mock-driver.js';
 import {fnAny, readJson, timers} from '../../test-utils.js';
 
 const devtoolsLog = readJson('../../fixtures/traces/lcp-m78.devtools.log.json', import.meta);
 
 const networkRecords = NetworkRecorder.recordsFromLogs(devtoolsLog);
-
-timers.useFakeTimers();
 
 /**
  * @param {Partial<LH.Artifacts.ImageElement>=} partial
@@ -70,6 +68,9 @@ function makeImageElements() {
 }
 
 describe('.fetchElementsWithSizingInformation', () => {
+  before(() => timers.useFakeTimers());
+  after(() => timers.dispose());
+
   let gatherer = makeImageElements();
   let driver = createMockDriver();
   beforeEach(() => {
@@ -128,6 +129,9 @@ describe('.fetchElementsWithSizingInformation', () => {
 });
 
 describe('.fetchSourceRules', () => {
+  before(() => timers.useFakeTimers());
+  after(() => timers.dispose());
+
   let gatherer = makeImageElements();
   let session = createMockSession();
 
@@ -229,6 +233,9 @@ describe('.fetchSourceRules', () => {
 });
 
 describe('.collectExtraDetails', () => {
+  before(() => timers.useFakeTimers());
+  after(() => timers.dispose());
+
   let gatherer = makeImageElements();
   let driver = createMockDriver().asDriver();
 
@@ -291,7 +298,7 @@ describe('.collectExtraDetails', () => {
   });
 });
 
-describe('FR compat', () => {
+describe('FR compat (image-elements)', () => {
   it('uses loadData in legacy mode', async () => {
     const gatherer = new ImageElements();
     const mockContext = createMockContext();

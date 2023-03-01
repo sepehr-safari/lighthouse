@@ -4,13 +4,13 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-import {strict as assert} from 'assert';
+import assert from 'assert/strict';
 
 import jsdom from 'jsdom';
 import jestMock from 'jest-mock';
 
-import reportAssets from '../../generator/report-assets.js';
-import {Util} from '../../renderer/util.js';
+import {reportAssets} from '../../generator/report-assets.js';
+import {ReportUtils, UIStrings} from '../../renderer/report-utils.js';
 import {DOM} from '../../renderer/dom.js';
 import {DetailsRenderer} from '../../renderer/details-renderer.js';
 import {ReportUIFeatures} from '../../renderer/report-ui-features.js';
@@ -76,7 +76,7 @@ describe('ReportUIFeatures', () => {
     };
 
     dom = new DOM(document.window.document);
-    sampleResults = Util.prepareReportResult(sampleResultsOrig);
+    sampleResults = ReportUtils.prepareReportResult(sampleResultsOrig);
     render(sampleResults);
   });
 
@@ -103,19 +103,29 @@ describe('ReportUIFeatures', () => {
     });
 
     describe('third-party filtering', () => {
-      let container;
+      let lhrJson;
 
       before(() => {
         const lhr = JSON.parse(JSON.stringify(sampleResults));
-        lhr.requestedUrl = lhr.finalUrl = 'http://www.example.com';
+        lhr.requestedUrl = lhr.finalDisplayedUrl = 'http://www.example.com';
+
         const webpAuditItemTemplate = {
           ...sampleResults.audits['modern-image-formats'].details.items[0],
           wastedBytes: 8.8 * 1024,
+          entity: undefined, // Remove entity classification from previous result.
         };
-        const renderBlockingAuditItemTemplate =
-          sampleResults.audits['render-blocking-resources'].details.items[0];
-        const textCompressionAuditItemTemplate =
-          sampleResults.audits['uses-text-compression'].details.items[0];
+        const renderBlockingAuditItemTemplate = {
+          ...sampleResults.audits['render-blocking-resources'].details.items[0],
+          entity: undefined, // Remove entity classification from previous result.
+        };
+        const textCompressionAuditItemTemplate = {
+          ...sampleResults.audits['uses-text-compression'].details.items[0],
+          entity: undefined, // Remove entity classification from previous result.
+        };
+        const bootupTimeAuditItemTemplate = {
+          ...sampleResults.audits['bootup-time'].details.items[0],
+          entity: undefined, // Remove entity classification from previous result.
+        };
 
         // Interleave first/third party URLs to test restoring order.
         lhr.audits['modern-image-formats'].details.items = [
@@ -202,79 +212,285 @@ describe('ReportUIFeatures', () => {
           },
         ];
 
-        // render a report onto the UIFeature dom
-        container = render(lhr);
-      });
-
-      it('filters out third party resources in on click', () => {
-        const filterCheckbox = dom.find('#modern-image-formats .lh-3p-filter-input', container);
-
-        function getUrlsInTable() {
-          return dom
-            .findAll('#modern-image-formats tr:not(.lh-row--hidden) .lh-text__url a:first-child', container) // eslint-disable-line max-len
-            .map(el => el.textContent);
-        }
-
-        expect(getUrlsInTable()).toEqual(['/img1.jpg', '/img2.jpg', '/img3.jpg']);
-        filterCheckbox.click();
-        expect(getUrlsInTable()).toEqual(['/img2.jpg']);
-        filterCheckbox.click();
-        expect(getUrlsInTable()).toEqual(['/img1.jpg', '/img2.jpg', '/img3.jpg']);
-      });
-
-      it('filters out sub-item rows of third party resources on click', () => {
-        dom.find('#unused-javascript', container);
-        const filterCheckbox = dom.find('#unused-javascript .lh-3p-filter-input', container);
-
-        function getRowIdentifiers() {
-          return dom
-            .findAll(
-              '#unused-javascript tbody tr:not(.lh-row--hidden)', container)
-            .map(el => el.textContent);
-        }
-
-        const initialExpected = [
-          '/script1.js(www.cdn.com)24.0 KiB8.8 KiB',
-          '10.0 KiB0.0 KiB',
-          '20.0 KiB0.0 KiB',
-          '/script2.js(www.example.com)24.0 KiB8.8 KiB',
-          '30.0 KiB0.0 KiB',
-          '40.0 KiB0.0 KiB',
-          '/script3.js(www.notexample.com)24.0 KiB8.8 KiB',
-          '50.0 KiB0.0 KiB',
-          '60.0 KiB0.0 KiB',
+        // A mix of 3P, 1P and Unattributable.
+        lhr.audits['bootup-time'].details.items = [
+          {
+            ...bootupTimeAuditItemTemplate,
+            url: 'http://www.example.com/dobetterweb/dbw_tester.html',
+          },
+          {
+            ...bootupTimeAuditItemTemplate,
+            url: 'Unattributable',
+          },
+          {
+            ...bootupTimeAuditItemTemplate,
+            url: 'http://www.example.com/dobetterweb/third_party/aggressive-promise-polyfill.js',
+          },
+          {
+            ...bootupTimeAuditItemTemplate,
+            url: 'http://www.cdn.com/script1.js',
+          },
         ];
 
-        expect(getRowIdentifiers()).toEqual(initialExpected);
-        filterCheckbox.click();
-        expect(getRowIdentifiers()).toEqual([
-          '/script2.js(www.example.com)24.0 KiB8.8 KiB',
-          '30.0 KiB0.0 KiB',
-          '40.0 KiB0.0 KiB',
-        ]);
-        filterCheckbox.click();
-        expect(getRowIdentifiers()).toEqual(initialExpected);
+        lhrJson = lhr;
       });
 
-      it('adds no filter for audits in thirdPartyFilterAuditExclusions', () => {
-        const checkboxClassName = 'lh-3p-filter-input';
+      describe('entity-classification based filtering works', () => {
+        let container;
 
-        const yesCheckbox = dom.find(`#modern-image-formats .${checkboxClassName}`, container);
-        expect(yesCheckbox).toBeTruthy();
+        before(() => {
+          // Setup entity-classification with recognized entities first.
+          lhrJson.entities = [
+            {
+              name: 'example.com',
+              isFirstParty: true,
+              isUnrecognized: true,
+              origins: ['http://www.example.com'],
+            },
+            {
+              name: 'cdn.com',
+              isUnrecognized: true,
+              origins: ['http://www.cdn.com'],
+            },
+            {
+              name: 'notexample.com',
+              isUnrecognized: true,
+              origins: ['http://www.notexample.com'],
+            },
+            {
+              name: 'google.com',
+              origins: ['http://www.google.com'],
+            },
+          ];
 
-        expect(() => dom.find(`#uses-rel-preconnect .${checkboxClassName}`, container))
-          .toThrowError('query #uses-rel-preconnect .lh-3p-filter-input not found');
+          // Entity resolution is done during prepareReportResult
+          const result = ReportUtils.prepareReportResult(lhrJson);
+
+          // render a report onto the UIFeature dom
+          container = render(result);
+        });
+
+        it('all items that contain a url have been marked with an entity for filtering', () => {
+          ['modern-image-formats', 'render-blocking-resources', 'unused-javascript',
+            'uses-text-compression'].forEach(audit => {
+            dom.findAll(`#${audit} tr`, container)
+              .filter(el => dom.findAll('.lh-text__url', el).length > 0)
+              .forEach(el => expect(el.dataset.entity).toBeTruthy());
+          });
+        });
+
+        it('filters out third party resources in on click', () => {
+          const filterCheckbox = dom.find('#modern-image-formats .lh-3p-filter-input', container);
+
+          function getUrlsInTable() {
+            return dom
+              .findAll('#modern-image-formats tr:not(.lh-row--hidden) .lh-text__url a:first-child', container) // eslint-disable-line max-len
+              .map(el => el.textContent);
+          }
+
+          expect(getUrlsInTable()).toEqual(['/img1.jpg', '/img2.jpg', '/img3.jpg']);
+          filterCheckbox.click();
+          expect(getUrlsInTable()).toEqual(['/img2.jpg']);
+          filterCheckbox.click();
+          expect(getUrlsInTable()).toEqual(['/img1.jpg', '/img2.jpg', '/img3.jpg']);
+
+          const filter3pCount = dom.find('#modern-image-formats .lh-3p-filter-count', container);
+          expect(filter3pCount.textContent).toEqual('2');
+        });
+
+        it('filters out sub-item rows of third party resources on click', () => {
+          dom.find('#unused-javascript', container);
+          const filterCheckbox = dom.find('#unused-javascript .lh-3p-filter-input', container);
+
+          function getRowIdentifiers() {
+            return dom
+              .findAll(
+                '#unused-javascript tbody tr:not(.lh-row--hidden)', container)
+              .map(el => el.textContent);
+          }
+
+          const initialExpected = [
+            '/script1.js(www.cdn.com)24.0 KiB8.8 KiB',
+            '10.0 KiB0.0 KiB',
+            '20.0 KiB0.0 KiB',
+            '/script2.js(www.example.com)24.0 KiB8.8 KiB',
+            '30.0 KiB0.0 KiB',
+            '40.0 KiB0.0 KiB',
+            '/script3.js(www.notexample.com)24.0 KiB8.8 KiB',
+            '50.0 KiB0.0 KiB',
+            '60.0 KiB0.0 KiB',
+          ];
+
+          expect(getRowIdentifiers()).toEqual(initialExpected);
+          filterCheckbox.click();
+          expect(getRowIdentifiers()).toEqual([
+            '/script2.js(www.example.com)24.0 KiB8.8 KiB',
+            '30.0 KiB0.0 KiB',
+            '40.0 KiB0.0 KiB',
+          ]);
+          filterCheckbox.click();
+          expect(getRowIdentifiers()).toEqual(initialExpected);
+
+          const filter3pCount = dom.find('#unused-javascript .lh-3p-filter-count', container);
+          expect(filter3pCount.textContent).toEqual('2');
+        });
+
+        it('adds no filter for audits in thirdPartyFilterAuditExclusions', () => {
+          const checkboxClassName = 'lh-3p-filter-input';
+
+          const yesCheckbox = dom.find(`#modern-image-formats .${checkboxClassName}`, container);
+          expect(yesCheckbox).toBeTruthy();
+
+          expect(() => dom.find(`#uses-rel-preconnect .${checkboxClassName}`, container))
+            .toThrowError('query #uses-rel-preconnect .lh-3p-filter-input not found');
+        });
+
+        it('treats non-classifiable url values as first-party', () => {
+          const auditEl = dom.find('#bootup-time', container);
+          const filterCheckboxEl = dom.find('.lh-3p-filter-input', auditEl);
+
+          // Ensure 3p filter is visible.
+          expect(dom.find('.lh-3p-filter', auditEl).hidden).toBeFalsy();
+
+          function getUrlsInTable() {
+            return dom.findAll('tbody tr:not(.lh-row--hidden) td:first-child', auditEl)
+              .map(el => el.textContent);
+          }
+
+          const preFilterRowSet = [
+            '/dobetterweb/dbw_tester.html(www.example.com)',
+            'Unattributable',
+            '…third_party/aggressive-promise-polyfill.js(www.example.com)',
+            '/script1.js(www.cdn.com)',
+          ];
+
+          expect(getUrlsInTable()).toEqual(preFilterRowSet);
+          filterCheckboxEl.click();
+          expect(getUrlsInTable()).toEqual(preFilterRowSet.filter(
+            text => !text.includes('cdn.com')));
+          filterCheckboxEl.click();
+          expect(getUrlsInTable()).toEqual(preFilterRowSet);
+
+          const filter3pCountEl = dom.find('.lh-3p-filter-count', auditEl);
+          expect(filter3pCountEl.textContent).toEqual('1');
+        });
+
+        it('filter is hidden when just third party resources', () => {
+          const filterControl =
+            dom.find('#render-blocking-resources .lh-3p-filter', container);
+          expect(filterControl.hidden).toEqual(true);
+          // Expect the hidden filter to still count third parties correctly.
+          const filter3pCount = dom.find('#render-blocking-resources .lh-3p-filter-count',
+            container);
+          expect(filter3pCount.textContent).toEqual('3');
+        });
+
+        it('filter is hidden for just first party resources', () => {
+          const filterControl = dom.find('#uses-text-compression .lh-3p-filter', container);
+          expect(filterControl.hidden).toEqual(true);
+          // Expect the hidden filter to still count third parties correctly.
+          const filter3pCount = dom.find('#uses-text-compression .lh-3p-filter-count', container);
+          expect(filter3pCount.textContent).toEqual('0');
+        });
       });
 
-      it('filter is hidden when just third party resources', () => {
-        const filterControl =
-          dom.find('#render-blocking-resources .lh-3p-filter', container);
-        expect(filterControl.hidden).toEqual(true);
-      });
+      describe('legacy third-party filtering continues to work', () => {
+        let container;
 
-      it('filter is hidden for just first party resources', () => {
-        const filterControl = dom.find('#uses-text-compression .lh-3p-filter', container);
-        expect(filterControl.hidden).toEqual(true);
+        before(() => {
+          // Remove entity-classification audit to fall back to origin string match
+          // based third-party filtering (legacy)
+          delete lhrJson.entities;
+
+          const result = ReportUtils.prepareReportResult(lhrJson);
+
+          // render a report onto the UIFeature dom
+          container = render(result);
+        });
+
+        it('filters out third party resources in on click', () => {
+          const filterCheckbox = dom.find('#modern-image-formats .lh-3p-filter-input', container);
+
+          function getUrlsInTable() {
+            return dom
+              .findAll('#modern-image-formats tr:not(.lh-row--hidden) .lh-text__url a:first-child', container) // eslint-disable-line max-len
+              .map(el => el.textContent);
+          }
+
+          expect(getUrlsInTable()).toEqual(['/img1.jpg', '/img2.jpg', '/img3.jpg']);
+          filterCheckbox.click();
+          expect(getUrlsInTable()).toEqual(['/img2.jpg']);
+          filterCheckbox.click();
+          expect(getUrlsInTable()).toEqual(['/img1.jpg', '/img2.jpg', '/img3.jpg']);
+          const filter3pCount = dom.find('#modern-image-formats .lh-3p-filter-count', container);
+          expect(filter3pCount.textContent).toEqual('2');
+        });
+
+        it('filters out sub-item rows of third party resources on click', () => {
+          dom.find('#unused-javascript', container);
+          const filterCheckbox = dom.find('#unused-javascript .lh-3p-filter-input', container);
+
+          function getRowIdentifiers() {
+            return dom
+              .findAll(
+                '#unused-javascript tbody tr:not(.lh-row--hidden)', container)
+              .map(el => el.textContent);
+          }
+
+          const initialExpected = [
+            '/script1.js(www.cdn.com)24.0 KiB8.8 KiB',
+            '10.0 KiB0.0 KiB',
+            '20.0 KiB0.0 KiB',
+            '/script2.js(www.example.com)24.0 KiB8.8 KiB',
+            '30.0 KiB0.0 KiB',
+            '40.0 KiB0.0 KiB',
+            '/script3.js(www.notexample.com)24.0 KiB8.8 KiB',
+            '50.0 KiB0.0 KiB',
+            '60.0 KiB0.0 KiB',
+          ];
+
+          expect(getRowIdentifiers()).toEqual(initialExpected);
+          filterCheckbox.click();
+          expect(getRowIdentifiers()).toEqual([
+            '/script2.js(www.example.com)24.0 KiB8.8 KiB',
+            '30.0 KiB0.0 KiB',
+            '40.0 KiB0.0 KiB',
+          ]);
+
+          filterCheckbox.click();
+          expect(getRowIdentifiers()).toEqual(initialExpected);
+          const filter3pCount = dom.find('#unused-javascript .lh-3p-filter-count', container);
+          expect(filter3pCount.textContent).toEqual('2');
+        });
+
+        it('adds no filter for audits in thirdPartyFilterAuditExclusions', () => {
+          const checkboxClassName = 'lh-3p-filter-input';
+
+          const yesCheckbox = dom.find(`#modern-image-formats .${checkboxClassName}`, container);
+          expect(yesCheckbox).toBeTruthy();
+
+          expect(() => dom.find(`#uses-rel-preconnect .${checkboxClassName}`, container))
+            .toThrowError('query #uses-rel-preconnect .lh-3p-filter-input not found');
+        });
+
+        it('filter is hidden when just third party resources', () => {
+          const filterControl =
+            dom.find('#render-blocking-resources .lh-3p-filter', container);
+          expect(filterControl.hidden).toEqual(true);
+          // Expect the hidden filter to still count third parties correctly.
+          const filter3pCount = dom.find('#render-blocking-resources .lh-3p-filter-count',
+            container);
+          expect(filter3pCount.textContent).toEqual('3');
+        });
+
+        it('filter is hidden for just first party resources', () => {
+          const filterControl = dom.find('#uses-text-compression .lh-3p-filter', container);
+          expect(filterControl.hidden).toEqual(true);
+          // Expect the hidden filter to still count third parties correctly.
+          const filter3pCount = dom.find('#uses-text-compression .lh-3p-filter-count',
+            container);
+          expect(filter3pCount.textContent).toEqual('0');
+        });
       });
     });
 
@@ -550,7 +766,7 @@ describe('ReportUIFeatures', () => {
       const container = render(sampleResults);
       for (const node of dom.findAll('[data-i18n]', container)) {
         const val = node.getAttribute('data-i18n');
-        assert.ok(val in Util.UIStrings, `Invalid data-i18n value of: "${val}" not found.`);
+        assert.ok(val in UIStrings, `Invalid data-i18n value of: "${val}" not found.`);
       }
     });
   });

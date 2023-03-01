@@ -3,41 +3,45 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
-'use strict';
 
-import isDeepEqual from 'lodash/isEqual.js';
-import {Driver} from './gather/driver.js';
-import {GatherRunner} from './gather/gather-runner.js';
-import {ReportScoring} from './scoring.js';
-import {Audit} from './audits/audit.js';
-import log from 'lighthouse-logger';
-import format from '../shared/localization/format.js';
-import * as stackPacks from './lib/stack-packs.js';
-import * as assetSaver from './lib/asset-saver.js';
 import fs from 'fs';
 import path from 'path';
+
+
+import log from 'lighthouse-logger';
+import isDeepEqual from 'lodash/isEqual.js';
+
+import {Driver} from './legacy/gather/driver.js';
+import {GatherRunner} from './legacy/gather/gather-runner.js';
+import {ReportScoring} from './scoring.js';
+import {Audit} from './audits/audit.js';
+import * as format from '../shared/localization/format.js';
+import * as stackPacks from './lib/stack-packs.js';
+import * as assetSaver from './lib/asset-saver.js';
 import {Sentry} from './lib/sentry.js';
-import ReportGenerator from '../report/generator/report-generator.js';
+import {ReportGenerator} from '../report/generator/report-generator.js';
 import {LighthouseError} from './lib/lh-error.js';
 import {lighthouseVersion} from '../root.js';
 import {getModuleDirectory} from '../esm-utils.js';
+import {EntityClassification} from './computed/entity-classification.js';
+import UrlUtils from './lib/url-utils.js';
 
 const moduleDir = getModuleDirectory(import.meta);
 
-/** @typedef {import('./gather/connections/connection.js').Connection} Connection */
+/** @typedef {import('./legacy/gather/connections/connection.js').Connection} Connection */
 /** @typedef {import('./lib/arbitrary-equality-map.js').ArbitraryEqualityMap} ArbitraryEqualityMap */
-/** @typedef {LH.Config.Config} Config */
+/** @typedef {LH.Config.LegacyResolvedConfig} Config */
 
 class Runner {
   /**
-   * @template {LH.Config.Config | LH.Config.FRConfig} TConfig
+   * @template {LH.Config.LegacyResolvedConfig | LH.Config.ResolvedConfig} TConfig
    * @param {LH.Artifacts} artifacts
-   * @param {{config: TConfig, driverMock?: Driver, computedCache: Map<string, ArbitraryEqualityMap>}} options
+   * @param {{resolvedConfig: TConfig, driverMock?: Driver, computedCache: Map<string, ArbitraryEqualityMap>}} options
    * @return {Promise<LH.RunnerResult|undefined>}
    */
   static async audit(artifacts, options) {
-    const {config, computedCache} = options;
-    const settings = config.settings;
+    const {resolvedConfig, computedCache} = options;
+    const settings = resolvedConfig.settings;
 
     try {
       const runnerStatus = {msg: 'Audit phase', id: 'lh:runner:audit'};
@@ -52,10 +56,10 @@ class Runner {
       // Potentially quit early
       if (settings.gatherMode && !settings.auditMode) return;
 
-      if (!config.audits) {
+      if (!resolvedConfig.audits) {
         throw new Error('No audits to evaluate.');
       }
-      const auditResultsById = await Runner._runAudits(settings, config.audits, artifacts,
+      const auditResultsById = await Runner._runAudits(settings, resolvedConfig.audits, artifacts,
           lighthouseRunWarnings, computedCache);
 
       // LHR construction phase
@@ -77,8 +81,8 @@ class Runner {
 
       /** @type {Record<string, LH.RawIcu<LH.Result.Category>>} */
       let categories = {};
-      if (config.categories) {
-        categories = ReportScoring.scoreAllCategories(config.categories, auditResultsById);
+      if (resolvedConfig.categories) {
+        categories = ReportScoring.scoreAllCategories(resolvedConfig.categories, auditResultsById);
       }
 
       log.timeEnd(resultsStatus);
@@ -88,7 +92,9 @@ class Runner {
       const i18nLhr = {
         lighthouseVersion,
         requestedUrl: artifacts.URL.requestedUrl,
-        finalUrl: artifacts.URL.finalUrl,
+        mainDocumentUrl: artifacts.URL.mainDocumentUrl,
+        finalDisplayedUrl: artifacts.URL.finalDisplayedUrl,
+        finalUrl: artifacts.URL.mainDocumentUrl,
         fetchTime: artifacts.fetchTime,
         gatherMode: artifacts.GatherContext.gatherMode,
         runtimeError: Runner.getArtifactRuntimeError(artifacts),
@@ -104,8 +110,11 @@ class Runner {
         audits: auditResultsById,
         configSettings: settings,
         categories,
-        categoryGroups: config.groups || undefined,
+        categoryGroups: resolvedConfig.groups || undefined,
         stackPacks: stackPacks.getStackPacks(artifacts.Stacks),
+        entities: await Runner.getEntityClassification(artifacts, {computedCache}),
+        fullPageScreenshot: resolvedConfig.settings.disableFullPageScreenshot ?
+          undefined : artifacts.FullPageScreenshot,
         timing: this._getTiming(artifacts),
         i18n: {
           rendererFormattedStrings: format.getRendererFormattedStrings(settings.locale),
@@ -119,8 +128,7 @@ class Runner {
       // LHR has now been localized.
       const lhr = /** @type {LH.Result} */ (i18nLhr);
 
-      // Save lhr to ./latest-run, but only if -GA is used.
-      if (settings.gatherMode && settings.auditMode) {
+      if (settings.auditMode) {
         const path = Runner._getDataSavePath(settings);
         assetSaver.saveLhr(lhr, path);
       }
@@ -135,17 +143,51 @@ class Runner {
   }
 
   /**
+   * @param {LH.Artifacts} artifacts
+   * @param {LH.Artifacts.ComputedContext} context
+   */
+  static async getEntityClassification(artifacts, context) {
+    const devtoolsLog = artifacts.devtoolsLogs[Audit.DEFAULT_PASS];
+    if (!devtoolsLog) return;
+    const classifiedEntities = await EntityClassification.request(
+      {URL: artifacts.URL, devtoolsLog}, context);
+
+    /** @type {Array<LH.Result.LhrEntity>} */
+    const entities = [];
+    for (const [entity, entityUrls] of classifiedEntities.urlsByEntity) {
+      const uniqueOrigins = new Set();
+      for (const url of entityUrls) {
+        const origin = UrlUtils.getOrigin(url);
+        if (origin) uniqueOrigins.add(origin);
+      }
+
+      /** @type {LH.Result.LhrEntity} */
+      const shortEntity = {
+        name: entity.name,
+        homepage: entity.homepage,
+        origins: [...uniqueOrigins],
+      };
+      // Reduce payload size in LHR JSON by omitting whats falsy.
+      if (entity === classifiedEntities.firstParty) shortEntity.isFirstParty = true;
+      if (entity.isUnrecognized) shortEntity.isUnrecognized = true;
+      entities.push(shortEntity);
+    }
+
+    return entities;
+  }
+
+  /**
    * User can run -G solo, -A solo, or -GA together
    * -G and -A will run partial lighthouse pipelines,
    * and -GA will run everything plus save artifacts and lhr to disk.
    *
-   * @template {LH.Config.Config | LH.Config.FRConfig} TConfig
-   * @param {(runnerData: {config: TConfig, driverMock?: Driver}) => Promise<LH.Artifacts>} gatherFn
-   * @param {{config: TConfig, driverMock?: Driver, computedCache: Map<string, ArbitraryEqualityMap>}} options
+   * @template {LH.Config.LegacyResolvedConfig | LH.Config.ResolvedConfig} TConfig
+   * @param {(runnerData: {resolvedConfig: TConfig, driverMock?: Driver}) => Promise<LH.Artifacts>} gatherFn
+   * @param {{resolvedConfig: TConfig, driverMock?: Driver, computedCache: Map<string, ArbitraryEqualityMap>}} options
    * @return {Promise<LH.Artifacts>}
    */
   static async gather(gatherFn, options) {
-    const settings = options.config.settings;
+    const settings = options.resolvedConfig.settings;
 
     // Either load saved artifacts from disk or from the browser.
     try {
@@ -167,7 +209,7 @@ class Runner {
         log.time(runnerStatus, 'verbose');
 
         artifacts = await gatherFn({
-          config: options.config,
+          resolvedConfig: options.resolvedConfig,
           driverMock: options.driverMock,
         });
 
@@ -245,22 +287,22 @@ class Runner {
   /**
    * Establish connection, load page and collect all required artifacts
    * @param {string} requestedUrl
-   * @param {{config: Config, computedCache: Map<string, ArbitraryEqualityMap>, driverMock?: Driver}} runnerOpts
+   * @param {{resolvedConfig: Config, computedCache: Map<string, ArbitraryEqualityMap>, driverMock?: Driver}} runnerOpts
    * @param {Connection} connection
    * @return {Promise<LH.Artifacts>}
    */
   static async _gatherArtifactsFromBrowser(requestedUrl, runnerOpts, connection) {
-    if (!runnerOpts.config.passes) {
+    if (!runnerOpts.resolvedConfig.passes) {
       throw new Error('No browser artifacts are either provided or requested.');
     }
     const driver = runnerOpts.driverMock || new Driver(connection);
     const gatherOpts = {
       driver,
       requestedUrl,
-      settings: runnerOpts.config.settings,
+      settings: runnerOpts.resolvedConfig.settings,
       computedCache: runnerOpts.computedCache,
     };
-    const artifacts = await GatherRunner.run(runnerOpts.config.passes, gatherOpts);
+    const artifacts = await GatherRunner.run(runnerOpts.resolvedConfig.passes, gatherOpts);
     return artifacts;
   }
 
@@ -518,5 +560,4 @@ class Runner {
   }
 }
 
-// TODO(esmodules): make this not a class.
 export {Runner};

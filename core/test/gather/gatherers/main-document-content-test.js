@@ -6,14 +6,14 @@
 
 import MainDocumentContent from '../../../gather/gatherers/main-document-content.js';
 import {NetworkRecorder} from '../../../lib/network-recorder.js';
-import {createMockContext} from '../../fraggle-rock/gather/mock-driver.js';
+import {createMockContext} from '../mock-driver.js';
 import {getURLArtifactFromDevtoolsLog, readJson} from '../../test-utils.js';
 
 const devtoolsLog = readJson('../../fixtures/traces/lcp-m78.devtools.log.json', import.meta);
 
 const URL = getURLArtifactFromDevtoolsLog(devtoolsLog);
 
-describe('FR compat', () => {
+describe('FR compat (main-document-content)', () => {
   it('uses loadData in legacy mode', async () => {
     const gatherer = new MainDocumentContent();
     const networkRecords = NetworkRecorder.recordsFromLogs(devtoolsLog);

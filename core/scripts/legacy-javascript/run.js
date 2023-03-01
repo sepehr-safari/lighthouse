@@ -41,7 +41,7 @@ const polyfills = LegacyJavascript.getPolyfillData();
  * @param {string[]} args
  */
 function runCommand(command, args) {
-  execFileSync(command, args, {cwd: scriptDir});
+  return execFileSync(command, args, {cwd: scriptDir});
 }
 
 /**
@@ -81,7 +81,7 @@ async function createVariant(options) {
       `<title>${name}</title><script src=main.bundle.min.js></script><p>${name}</p>`);
 
     // Note: No babelrc will make babel a glorified `cp`.
-    runCommand('yarn', [
+    const babelOutputBuffer = runCommand('yarn', [
       'babel',
       `${dir}/main.js`,
       '--config-file', `${dir}/.babelrc`,
@@ -89,6 +89,7 @@ async function createVariant(options) {
       '-o', `${dir}/main.transpiled.js`,
       '--source-maps', 'inline',
     ]);
+    fs.writeFileSync(`${dir}/babel-stdout.txt`, babelOutputBuffer.toString());
 
     // Transform any require statements (like for core-js) into a big bundle.
     runCommand('yarn', [
@@ -145,10 +146,9 @@ function getLegacyJavascriptResults(code, map, {sourceMaps}) {
   /** @type {Pick<LH.Artifacts, 'devtoolsLogs'|'URL'|'Scripts'|'SourceMaps'>} */
   const artifacts = {
     URL: {
-      initialUrl: 'about:blank',
       requestedUrl: documentUrl,
       mainDocumentUrl: documentUrl,
-      finalUrl: documentUrl,
+      finalDisplayedUrl: documentUrl,
     },
     devtoolsLogs: {
       [LegacyJavascript.DEFAULT_PASS]: devtoolsLogs,
@@ -245,15 +245,15 @@ async function main() {
     });
   }
 
-  for (const coreJsVersion of ['2.6.12', '3.19.1']) {
+  for (const coreJsVersion of ['2.6.12', '3.27.2']) {
     const major = coreJsVersion.split('.')[0];
     removeCoreJs();
     installCoreJs(coreJsVersion);
 
     const moduleOptions = [
-      {esmodules: false},
+      {esmodules: false, bugfixes: false},
       // Output: https://gist.github.com/connorjclark/515d05094ffd1fc038894a77156bf226
-      {esmodules: true},
+      {esmodules: true, bugfixes: false},
       {esmodules: true, bugfixes: true},
     ];
     for (const {esmodules, bugfixes} of moduleOptions) {
@@ -270,6 +270,7 @@ async function main() {
                 useBuiltIns: 'entry',
                 corejs: major,
                 bugfixes,
+                debug: true,
               },
             ],
           ],

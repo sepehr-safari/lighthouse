@@ -3,7 +3,6 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
-'use strict';
 
 /**
  * @fileoverview Identifies polyfills and transforms that should not be present if using module/nomodule pattern.
@@ -20,11 +19,11 @@
 
 import fs from 'fs';
 
+import {Audit} from '../audit.js';
 import {ByteEfficiencyAudit} from './byte-efficiency-audit.js';
-
-import JsBundles from '../../computed/js-bundles.js';
+import {EntityClassification} from '../../computed/entity-classification.js';
+import {JSBundles} from '../../computed/js-bundles.js';
 import * as i18n from '../../lib/i18n/i18n.js';
-import thirdPartyWeb from '../../lib/third-party-web.js';
 import {getRequestForScript} from '../../lib/script-helpers.js';
 import {LH_ROOT} from '../../../root.js';
 
@@ -38,8 +37,8 @@ const UIStrings = {
   /** Title of a Lighthouse audit that tells the user about legacy polyfills and transforms used on the page. This is displayed in a list of audit titles that Lighthouse generates. */
   title: 'Avoid serving legacy JavaScript to modern browsers',
   // eslint-disable-next-line max-len
-  // TODO: web.dev article. this codelab is good starting place: https://web.dev/codelab-serve-modern-code/
-  /** Description of a Lighthouse audit that tells the user about old JavaScript that is no longer needed. This is displayed after a user expands the section to see more. No character length limits. 'Learn More' becomes link text to additional documentation. */
+  // TODO: developer.chrome.com article. this codelab is good starting place: https://web.dev/codelab-serve-modern-code/
+  /** Description of a Lighthouse audit that tells the user about old JavaScript that is no longer needed. This is displayed after a user expands the section to see more. No character length limits. The last sentence starting with 'Learn' becomes link text to additional documentation. */
   description: 'Polyfills and transforms enable legacy browsers to use new JavaScript features. However, many aren\'t necessary for modern browsers. For your bundled JavaScript, adopt a modern script deployment strategy using module/nomodule feature detection to reduce the amount of code shipped to modern browsers, while retaining support for legacy browsers. [Learn how to use modern JavaScript](https://web.dev/publish-modern-javascript/)',
 };
 
@@ -223,7 +222,6 @@ class LegacyJavascript extends ByteEfficiencyAudit {
       ['String.fromCodePoint', 'es6.string.from-code-point'],
       ['String.raw', 'es6.string.raw'],
       ['String.prototype.repeat', 'es6.string.repeat'],
-      ['Array.prototype.includes', 'es7.array.includes'],
       ['Object.entries', 'es7.object.entries'],
       ['Object.getOwnPropertyDescriptors', 'es7.object.get-own-property-descriptors'],
       ['Object.values', 'es7.object.values'],
@@ -267,7 +265,7 @@ class LegacyJavascript extends ByteEfficiencyAudit {
       },
       {
         name: '@babel/plugin-transform-regenerator',
-        expression: /regeneratorRuntime\.a?wrap/.source,
+        expression: /regeneratorRuntime\(?\)?\.a?wrap/.source,
         // Example of this transform: https://gist.github.com/connorjclark/af8bccfff377ac44efc104a79bc75da2
         // `regeneratorRuntime.awrap` is generated for every usage of `await`, and adds ~80 bytes each.
         estimateBytes: result => result.count * 80,
@@ -403,8 +401,11 @@ class LegacyJavascript extends ByteEfficiencyAudit {
    * @return {Promise<ByteEfficiencyProduct>}
    */
   static async audit_(artifacts, networkRecords, context) {
-    const mainDocumentEntity = thirdPartyWeb.getEntity(artifacts.URL.finalUrl);
-    const bundles = await JsBundles.request(artifacts, context);
+    const devtoolsLog = artifacts.devtoolsLogs[Audit.DEFAULT_PASS];
+    const classifiedEntities = await EntityClassification.request(
+      {URL: artifacts.URL, devtoolsLog}, context);
+
+    const bundles = await JSBundles.request(artifacts, context);
 
     /** @type {Item[]} */
     const items = [];
@@ -452,12 +453,12 @@ class LegacyJavascript extends ByteEfficiencyAudit {
     const wastedBytesByUrl = new Map();
     for (const item of items) {
       // Only estimate savings if first party code has legacy code.
-      if (thirdPartyWeb.isFirstParty(item.url, mainDocumentEntity)) {
+      if (classifiedEntities.isFirstParty(item.url)) {
         wastedBytesByUrl.set(item.url, item.wastedBytes);
       }
     }
 
-    /** @type {LH.Audit.Details.OpportunityColumnHeading[]} */
+    /** @type {LH.Audit.Details.TableColumnHeading[]} */
     const headings = [
       /* eslint-disable max-len */
       {key: 'url', valueType: 'url', subItemsHeading: {key: 'location', valueType: 'source-location'}, label: str_(i18n.UIStrings.columnURL)},

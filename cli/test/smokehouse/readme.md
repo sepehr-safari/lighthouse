@@ -6,7 +6,7 @@ By default this is done using the Lighthouse CLI (to exercise the full pipeline)
 
 ## Options
 
-See [`SmokehouseOptions`](https://github.com/GoogleChrome/lighthouse/blob/master/cli/test/smokehouse/smokehouse.js#L23).
+See [`SmokehouseOptions`](https://github.com/GoogleChrome/lighthouse/blob/main/cli/test/smokehouse/smokehouse.js#L23).
 
 ## Test definitions
 
@@ -14,7 +14,7 @@ See [`SmokehouseOptions`](https://github.com/GoogleChrome/lighthouse/blob/master
 | -------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `id`           | `string`                           | The string identifier of the test.                                                                                               |
 | `expectations` | `{lhr: Object, artifacts: Object}` | See below.                                                                                                                       |
-| `config`       | `LH.Config.Json` (optional)        | An optional Lighthouse config. If not specified, the default config is used.                                                     |
+| `config`       | `LH.Config` (optional)        | An optional Lighthouse config. If not specified, the default config is used.                                                     |
 | `runSerially`  | `boolean` (optional)               | An optional flag. If set to true, the test won't be run in parallel to other tests. Useful if the test is performance sensitive. |
 
 ### Expectations
@@ -64,9 +64,11 @@ Individual elements of an array can be asserted by using numeric properties in a
 
 However, if an array literal is used as the expectation, an extra condition is enforced that the actual array _must_ have the same length as the provided expected array.
 
-Arrays can be checked against a subset of elements using the special `_includes` property. The value of `_includes` _must_ be an array. Each assertion in `_includes` will remove the matching item from consideration for the rest.
+Arrays and objects can be checked against a subset of elements using the special `_includes` property. The value of `_includes` _must_ be an array. Each assertion in `_includes` will remove the matching item from consideration for the rest.
 
-Arrays can be asserted to not match any elements using the special `_excludes` property. The value of `_excludes` _must_ be an array. If an `_includes` check is defined before an `_excludes` check, only the element not matched under the previous will be considered.
+Arrays and objects can be asserted to not match any elements using the special `_excludes` property. The value of `_excludes` _must_ be an array. If an `_includes` check is defined before an `_excludes` check, only the element not matched under the previous will be considered.
+
+If an object is checked using `_includes` or `_excludes`, it will be checked against the `Object.entries` array.
 
 **Examples**:
 | Actual | Expected | Result |
@@ -79,6 +81,8 @@ Arrays can be asserted to not match any elements using the special `_excludes` p
 | `[{timeInMs: 5}, {timeInMs: 15}]` | `{_includes: [{timeInMs: 5}], _excludes: [{timeInMs: 15}]}` | ❌ FAIL |
 | `[{timeInMs: 5}, {timeInMs: 15}]` | `{_includes: [{timeInMs: 5}], _excludes: [{}]}` | ❌ FAIL |
 | `[{timeInMs: 5}, {timeInMs: 15}]` | `[{timeInMs: 5}]` | ❌ FAIL |
+| `{'foo': 1}` | `{_includes: [['foo', 1]]}` | ✅ PASS |
+| `{'foo': 1, 'bar': 2}` | `{_includes: [['foo', 1]], _excludes: [['bar', 2]]}` | ❌ FAIL |
 
 ### Special environment checks
 
@@ -184,7 +188,7 @@ Smokehouse comes with a core set of test definitions, but it can run any set of 
   const expectations = [{
     lhr: {
       requestedUrl: 'http://localhost:8080/index.html',
-      finalUrl: 'http://localhost:8080/index.html',
+      finalDisplayedUrl: 'http://localhost:8080/index.html',
       audits: {
         'preload-as': {
           score: 1,

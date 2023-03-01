@@ -3,24 +3,26 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
-'use strict';
 
 import {Audit} from '../audit.js';
 import * as i18n from '../../lib/i18n/i18n.js';
+import {ProcessedTrace} from '../../computed/processed-trace.js';
 
 const UIStrings = {
   /** Title of a Lighthouse audit that provides detail on the doctype of a page. This descriptive title is shown to users when the pages's doctype is set to HTML. */
   title: 'Page has the HTML doctype',
   /** Title of a Lighthouse audit that provides detail on the doctype of a page. This descriptive title is shown to users when the page's doctype is not set to HTML. */
   failureTitle: 'Page lacks the HTML doctype, thus triggering quirks-mode',
-  /** Description of a Lighthouse audit that tells the user why they should define an HTML doctype. This is displayed after a user expands the section to see more. No character length limits. 'Learn More' becomes link text to additional documentation. */
+  /** Description of a Lighthouse audit that tells the user why they should define an HTML doctype. This is displayed after a user expands the section to see more. No character length limits. The last sentence starting with 'Learn' becomes link text to additional documentation. */
   description: 'Specifying a doctype prevents the browser ' +
     'from switching to quirks-mode. ' +
-    '[Learn more about the doctype declaration](https://web.dev/doctype/).',
+    '[Learn more about the doctype declaration](https://developer.chrome.com/docs/lighthouse/best-practices/doctype/).',
   /** Explanatory message stating that the document has no doctype. */
   explanationNoDoctype: 'Document must contain a doctype',
-  /** Explanatory message stating that the document has wrong doctype */
-  explanationWrongDoctype: 'Document contains a doctype that triggers quirks-mode',
+  /** Explanatory message stating that the document has wrong doctype that triggers `quirks-mode` */
+  explanationWrongDoctype: 'Document contains a `doctype` that triggers `quirks-mode`',
+  /** Explanatory message stating that the document has wrong doctype that triggers `limited-quirks-mode` */
+  explanationLimitedQuirks: 'Document contains a `doctype` that triggers `limited-quirks-mode`',
   /** Explanatory message stating that the publicId field is not empty. */
   explanationPublicId: 'Expected publicId to be an empty string',
   /** Explanatory message stating that the systemId field is not empty. */
@@ -42,14 +44,16 @@ class Doctype extends Audit {
       failureTitle: str_(UIStrings.failureTitle),
       description: str_(UIStrings.description),
       requiredArtifacts: ['Doctype'],
+      __internalOptionalArtifacts: ['InspectorIssues', 'traces'],
     };
   }
 
   /**
    * @param {LH.Artifacts} artifacts
-   * @return {LH.Audit.Product}
+   * @param {LH.Audit.Context} context
+   * @return {Promise<LH.Audit.Product>}
    */
-  static audit(artifacts) {
+  static async audit(artifacts, context) {
     if (!artifacts.Doctype) {
       return {
         score: 0,
@@ -62,6 +66,34 @@ class Doctype extends Audit {
     const doctypePublicId = artifacts.Doctype.publicId;
     const doctypeSystemId = artifacts.Doctype.systemId;
     const compatMode = artifacts.Doctype.documentCompatMode;
+
+    /** @type {LH.Crdp.Audits.QuirksModeIssueDetails[]} */
+    let quirksModeIssues = [];
+    if (artifacts.traces && artifacts.InspectorIssues) {
+      const trace = artifacts.traces[Audit.DEFAULT_PASS];
+      const processedTrace = await ProcessedTrace.request(trace, context);
+      const mainFrameId = processedTrace.mainFrameInfo.frameId;
+      quirksModeIssues =
+        artifacts.InspectorIssues.quirksModeIssue.filter(issue => issue.frameId === mainFrameId);
+    }
+
+    // Can only determine limited quirks mode with some helps from the protocol via
+    // inspector issues. But cannot get inspector issues in snapshot mode, so in that
+    // case we cannot distinguish no-quirks-mode from limited-quirks-mode.
+    const isLimitedQuirksMode = quirksModeIssues.some(issue => issue.isLimitedQuirksMode);
+
+    if (compatMode === 'CSS1Compat' && !isLimitedQuirksMode) {
+      return {
+        score: 1,
+      };
+    }
+
+    if (isLimitedQuirksMode) {
+      return {
+        score: 0,
+        explanation: str_(UIStrings.explanationLimitedQuirks),
+      };
+    }
 
     if (doctypePublicId !== '') {
       return {
@@ -88,16 +120,10 @@ class Doctype extends Audit {
 
     // Catch-all for any quirks-mode situations the above checks didn't get.
     // https://github.com/GoogleChrome/lighthouse/issues/10030
-    if (compatMode === 'BackCompat') {
-      return {
-        score: 0,
-        explanation: str_(UIStrings.explanationWrongDoctype),
-      };
-    } else {
-      return {
-        score: 1,
-      };
-    }
+    return {
+      score: 0,
+      explanation: str_(UIStrings.explanationWrongDoctype),
+    };
   }
 }
 

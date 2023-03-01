@@ -301,7 +301,7 @@ export class LighthouseReportViewer {
         history.pushState({}, '', LighthouseReportViewer.APP_URL);
       }
     } catch (e) {
-      logger.error(`Error rendering report: ${e.message}`);
+      logger.error(`Error rendering report: ${e.stack}`);
       container.innerHTML = '';
       throw e;
     } finally {
@@ -340,6 +340,8 @@ export class LighthouseReportViewer {
     } catch (err) {
       logger.error(err.message);
     }
+
+    document.dispatchEvent(new CustomEvent('lh-file-upload-test-ack'));
   }
 
   /**

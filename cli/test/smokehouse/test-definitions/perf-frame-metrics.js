@@ -4,7 +4,7 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-/** @type {LH.Config.Json} */
+/** @type {LH.Config} */
 const config = {
   extends: 'lighthouse:default',
   settings: {
@@ -12,6 +12,10 @@ const config = {
     // preload-fonts isn't a performance audit, but can easily leverage the font
     // webpages present here, hence the inclusion of 'best-practices'.
     onlyCategories: ['performance', 'best-practices'],
+
+    // BF cache will request the page again, initiating additional network requests.
+    // Disable the audit so we only detect requests from the normal page load.
+    skipAudits: ['bf-cache'],
 
     // A mixture of under, over, and meeting budget to exercise all paths.
     budgets: [{
@@ -60,7 +64,7 @@ const expectations = {
   },
   lhr: {
     requestedUrl: 'http://localhost:10200/perf/frame-metrics.html',
-    finalUrl: 'http://localhost:10200/perf/frame-metrics.html',
+    finalDisplayedUrl: 'http://localhost:10200/perf/frame-metrics.html',
     audits: {
       'metrics': {
         score: null,
@@ -72,7 +76,7 @@ const expectations = {
               firstContentfulPaintAllFrames: '<5000',
               largestContentfulPaint: '>5000',
               largestContentfulPaintAllFrames: '<5000',
-              cumulativeLayoutShift: '0.197 +/- 0.001',
+              cumulativeLayoutShift: '0.133 +/- 0.001',
               cumulativeLayoutShiftMainFrame: '0.001 +/- 0.0005',
               totalCumulativeLayoutShift: '0.001 +/- 0.0005',
             },
@@ -80,6 +84,20 @@ const expectations = {
               lcpInvalidated: false,
             },
           ],
+        },
+      },
+      'largest-contentful-paint': {
+        // Non-all-frames value.
+        numericValue: '>5000',
+      },
+      'largest-contentful-paint-element': {
+        details: {
+          items: [{
+            node: {
+              // Element should be from main frame while metric is not LCPAllFrames.
+              nodeLabel: 'This is the main frame LCP and FCP.',
+            },
+          }],
         },
       },
     },

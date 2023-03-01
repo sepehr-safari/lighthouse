@@ -8,7 +8,7 @@ import pwaDetailsExpectations from './pwa-expectations-details.js';
 
 const pwaRocksExpectations = {...pwaDetailsExpectations, hasIconsAtLeast512px: false};
 
-/** @type {LH.Config.Json} */
+/** @type {LH.Config} */
 const config = {
   extends: 'lighthouse:default',
   settings: {
@@ -25,7 +25,7 @@ const expectations = {
     // Archived version of https://github.com/pwarocks/pwa.rocks
     // Fork is here: https://github.com/connorjclark/pwa.rocks
     requestedUrl: 'https://connorjclark.github.io/pwa.rocks/',
-    finalUrl: 'https://connorjclark.github.io/pwa.rocks/',
+    finalDisplayedUrl: 'https://connorjclark.github.io/pwa.rocks/',
     audits: {
       'service-worker': {
         score: 1,

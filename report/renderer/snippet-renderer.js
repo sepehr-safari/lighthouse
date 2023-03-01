@@ -7,7 +7,8 @@
 /** @typedef {import('./details-renderer').DetailsRenderer} DetailsRenderer */
 /** @typedef {import('./dom').DOM} DOM */
 
-import {Util} from './util.js';
+import {Util} from '../../shared/util.js';
+import {Globals} from './report-globals.js';
 
 /** @enum {number} */
 const LineVisibility = {
@@ -104,7 +105,7 @@ export class SnippetRenderer {
     const {
       snippetCollapseButtonLabel,
       snippetExpandButtonLabel,
-    } = Util.i18n.strings;
+    } = Globals.strings;
     dom.find(
       '.lh-snippet__btn-label-collapse',
       header

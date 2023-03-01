@@ -23,6 +23,7 @@
       "tts": 223424,
       "s": "t"
     },
+    {"args":{"name":"CrRendererMain"},"cat":"__metadata","name":"thread_name","ph":"M","pid":84742,"tid":775,"ts":0},
     {
       "pid": 84742,
       "tid": 775,

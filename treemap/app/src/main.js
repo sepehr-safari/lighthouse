@@ -11,7 +11,7 @@
 import {TreemapUtil} from './util.js';
 import {DragAndDrop} from '../../../viewer/app/src/drag-and-drop.js';
 import {GithubApi} from '../../../viewer/app/src/github-api.js';
-import {I18n} from '../../../report/renderer/i18n.js';
+import {I18nFormatter} from '../../../report/renderer/i18n-formatter.js';
 import {TextEncoding} from '../../../report/renderer/text-encoding.js';
 import {Logger} from '../../../report/renderer/logger.js';
 
@@ -75,7 +75,15 @@ class TreemapViewer {
     /** @type {WeakMap<LH.Treemap.Node, LH.Treemap.NodePath>} */
     this.nodeToPathMap = new WeakMap();
 
-    this.documentUrl = new URL(options.lhr.finalUrl);
+    // Priority breakdown:
+    // 1) `mainDocumentUrl`: This is what we want post-10.0 for navigation reports.
+    // 2) `finalUrl`: This is what we want pre-10.0 for navigation reports.
+    // 3) `finalDisplayedUrl`: Timespan and snapshot reports don't have either of the above URLs, so use this one for display / origin check purposes.
+    const documentUrlString = options.lhr.mainDocumentUrl ||
+      options.lhr.finalUrl ||
+      options.lhr.finalDisplayedUrl;
+
+    this.documentUrl = new URL(documentUrlString);
     this.el = el;
     this.getHueForD1NodeName = TreemapUtil.stableHasher(TreemapUtil.COLOR_HUES);
 
@@ -85,7 +93,12 @@ class TreemapViewer {
       try {
         const url = new URL(node.name);
         node.name = TreemapUtil.elideSameOrigin(url, this.documentUrl);
-        if (url.href === this.documentUrl.href) {
+        const isInlineHtmlNode =
+          node.children?.every(child => child.name.startsWith('(inline)')) ||
+          // Backport for treemap data that does not add the "(inline)" prefix to each inline script.
+          // This is pre-10.0 when the `finalUrl` represented the main document url.
+          url.href === this.documentUrl.href;
+        if (isInlineHtmlNode) {
           node.name += ' (inline)';
         }
       } catch {}
@@ -143,7 +156,7 @@ class TreemapViewer {
 
     for (const [group, depthOneNodes] of Object.entries(this.depthOneNodesByGroup)) {
       const allLabel = {
-        scripts: TreemapUtil.i18n.strings.allScriptsDropdownLabel,
+        scripts: TreemapUtil.strings.allScriptsDropdownLabel,
       }[group] || `All ${group}`;
       makeOption({type: 'group', value: group}, allLabel);
       for (const depthOneNode of depthOneNodes) {
@@ -255,7 +268,7 @@ class TreemapViewer {
 
       return {
         id: 'unused-bytes',
-        label: TreemapUtil.i18n.strings.unusedBytesLabel,
+        label: TreemapUtil.strings.unusedBytesLabel,
         subLabel: TreemapUtil.i18n.formatBytesWithBestUnit(root.unusedBytes),
         enabled: true,
       };
@@ -315,8 +328,9 @@ class TreemapViewer {
 
       return {
         id: 'duplicate-modules',
-        label: TreemapUtil.i18n.strings.duplicateModulesLabel,
-        subLabel: enabled ? TreemapUtil.i18n.formatBytesWithBestUnit(potentialByteSavings) : 'N/A',
+        label: TreemapUtil.strings.duplicateModulesLabel,
+        subLabel: enabled ?
+          TreemapUtil.i18n.formatBytesWithBestUnit(potentialByteSavings) : 'N/A',
         highlights,
         enabled,
       };
@@ -327,8 +341,9 @@ class TreemapViewer {
 
     viewModes.push({
       id: 'all',
-      label: TreemapUtil.i18n.strings.allLabel,
-      subLabel: TreemapUtil.i18n.formatBytesWithBestUnit(this.currentTreemapRoot.resourceBytes),
+      label: TreemapUtil.strings.allLabel,
+      subLabel: TreemapUtil.i18n.formatBytesWithBestUnit(
+        this.currentTreemapRoot.resourceBytes),
       enabled: true,
     });
 
@@ -518,20 +533,20 @@ class TreemapViewer {
       ],
       columns: [
         // eslint-disable-next-line max-len
-        {title: TreemapUtil.i18n.strings.tableColumnName, field: 'name', widthGrow: 5, tooltip: makeNameTooltip},
+        {title: TreemapUtil.strings.tableColumnName, field: 'name', widthGrow: 5, tooltip: makeNameTooltip},
         // eslint-disable-next-line max-len
-        {title: TreemapUtil.i18n.strings.resourceBytesLabel, field: 'resourceBytes', headerSortStartingDir: 'desc', tooltip: makeBytesTooltip('resourceBytes'), formatter: cell => {
+        {title: TreemapUtil.strings.resourceBytesLabel, field: 'resourceBytes', headerSortStartingDir: 'desc', tooltip: makeBytesTooltip('resourceBytes'), formatter: cell => {
           const value = cell.getValue();
           return TreemapUtil.i18n.formatBytesWithBestUnit(value);
         }},
         // eslint-disable-next-line max-len
-        {title: TreemapUtil.i18n.strings.unusedBytesLabel, field: 'unusedBytes', widthGrow: 1, sorterParams: {alignEmptyValues: 'bottom'}, headerSortStartingDir: 'desc', tooltip: makeBytesTooltip('unusedBytes'), formatter: cell => {
+        {title: TreemapUtil.strings.unusedBytesLabel, field: 'unusedBytes', widthGrow: 1, sorterParams: {alignEmptyValues: 'bottom'}, headerSortStartingDir: 'desc', tooltip: makeBytesTooltip('unusedBytes'), formatter: cell => {
           const value = cell.getValue();
           if (value === undefined) return '';
           return TreemapUtil.i18n.formatBytesWithBestUnit(value);
         }},
         // eslint-disable-next-line max-len
-        {title: TreemapUtil.i18n.strings.coverageColumnName, widthGrow: 3, headerSort: false, tooltip: makeCoverageTooltip, formatter: cell => {
+        {title: TreemapUtil.strings.coverageColumnName, widthGrow: 3, headerSort: false, tooltip: makeCoverageTooltip, formatter: cell => {
           /** @type {typeof data[number]} */
           const dataRow = cell.getRow().getData();
 
@@ -579,8 +594,8 @@ class TreemapViewer {
   makeCaption(node) {
     const partitionBy = this.currentViewMode.partitionBy || 'resourceBytes';
     const partitionByStr = {
-      resourceBytes: TreemapUtil.i18n.strings.resourceBytesLabel,
-      unusedBytes: TreemapUtil.i18n.strings.unusedBytesLabel,
+      resourceBytes: TreemapUtil.strings.resourceBytesLabel,
+      unusedBytes: TreemapUtil.strings.unusedBytesLabel,
     }[partitionBy];
     const bytes = node[partitionBy];
     const total = this.currentTreemapRoot[partitionBy];
@@ -762,13 +777,10 @@ class LighthouseTreemap {
 
     const locale = options.lhr.configSettings.locale;
     document.documentElement.lang = locale;
-    const i18n = new I18n(locale, {
-      // Set missing renderer strings to default (english) values.
-      ...TreemapUtil.UIStrings,
-      // `strings` is generated in build/build-treemap.js
-      ...strings[options.lhr.configSettings.locale],
-    });
-    TreemapUtil.i18n = i18n;
+
+    // `strings` is generated in build/build-treemap.js
+    TreemapUtil.applyStrings(strings[options.lhr.configSettings.locale]);
+    TreemapUtil.i18n = new I18nFormatter(locale);
 
     // Fill in all i18n data.
     for (const node of document.querySelectorAll('[data-i18n]')) {
@@ -776,7 +788,7 @@ class LighthouseTreemap {
       // so this cannot be undefined as long as `report-ui-features.data-i18n` test passes.
       const i18nAttr = /** @type {keyof typeof TreemapUtil['UIStrings']} */ (
         node.getAttribute('data-i18n'));
-      node.textContent = TreemapUtil.i18n.strings[i18nAttr];
+      node.textContent = TreemapUtil.strings[i18nAttr];
     }
 
     if (treemapViewer) {

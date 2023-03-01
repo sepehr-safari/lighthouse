@@ -27,10 +27,6 @@ There are two outputs to this test:
 
 For the signals of each variant, the expectation is that the number of them only goes up.
 
-## Future Work
-
-* Use real apps to see how over-transpiling affects real code. Necessary for making an opprotunity.
-
 ## Notes
 
 Digging into core-js: https://gist.github.com/connorjclark/cc583554ff07cba7cdc416c06721fd6a

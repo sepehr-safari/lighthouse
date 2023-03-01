@@ -15,7 +15,7 @@
  * A config with no throttling used for tricky-metrics tests.
  * Those class of tricky metrics need to use observed metrics and DevTools throttling has too many bugs
  * to capture the nuances we're testing.
- * @type {LH.Config.Json}
+ * @type {LH.Config}
  */
 const config = {
   extends: 'lighthouse:default',
@@ -31,7 +31,7 @@ const config = {
 const expectations = {
   lhr: {
     requestedUrl: 'http://localhost:10200/tricky-tti-late-fcp.html',
-    finalUrl: 'http://localhost:10200/tricky-tti-late-fcp.html',
+    finalDisplayedUrl: 'http://localhost:10200/tricky-tti-late-fcp.html',
     audits: {
       'interactive': {
         // FCP at least ~5 seconds out

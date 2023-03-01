@@ -4,7 +4,7 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-import TimingSummary from '../../../computed/metrics/timing-summary.js';
+import {TimingSummary} from '../../../computed/metrics/timing-summary.js';
 import {readJson} from '../../test-utils.js';
 
 const trace = readJson('../../fixtures/traces/frame-metrics-m90.json', import.meta);
@@ -73,7 +73,7 @@ describe('Timing summary', () => {
     `);
     // Includes performance metrics
     expect(result.metrics.firstContentfulPaint).toBeDefined();
-    // Includes timestamps from trace of tab
+    // Includes timestamps from the processed trace
     expect(result.metrics.observedFirstContentfulPaint).toBeDefined();
     // Includs visual metrics from Speedline
     expect(result.metrics.observedFirstVisualChange).toBeDefined();

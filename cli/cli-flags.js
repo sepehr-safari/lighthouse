@@ -7,6 +7,7 @@
 /* eslint-disable max-len */
 
 import fs from 'fs';
+import path from 'path';
 
 import yargs from 'yargs';
 import * as yargsHelpers from 'yargs/helpers';
@@ -112,11 +113,6 @@ function getYargsParser(manualArgv) {
         default: false,
         describe: 'Prints a list of all required trace categories and exits',
       },
-      'print-config': {
-        type: 'boolean',
-        default: false,
-        describe: 'Print the normalized config for the given config and options, then exit.',
-      },
       'debug-navigation': {
         type: 'boolean',
         describe: 'Pause after page load to wait for permission to continue the run, evaluate `continueLighthouseRun` in the console to continue.',
@@ -175,7 +171,7 @@ function getYargsParser(manualArgv) {
       },
       'enable-error-reporting': {
         type: 'boolean',
-        describe: 'Enables error reporting, overriding any saved preference. --no-enable-error-reporting will do the opposite. More: https://github.com/GoogleChrome/lighthouse/blob/master/docs/error-reporting.md',
+        describe: 'Enables error reporting, overriding any saved preference. --no-enable-error-reporting will do the opposite. More: https://github.com/GoogleChrome/lighthouse/blob/main/docs/error-reporting.md',
       },
       'gather-mode': {
         alias: 'G',
@@ -209,12 +205,16 @@ function getYargsParser(manualArgv) {
         type: 'string',
         describe: 'The path to the budget.json file for LightWallet.',
       },
+      'disable-full-page-screenshot': {
+        type: 'boolean',
+        describe: 'Disables collection of the full page screenshot, which can be quite large',
+      },
     })
     .group([
-      'save-assets', 'list-all-audits', 'list-locales', 'list-trace-categories', 'print-config', 'additional-trace-categories',
+      'save-assets', 'list-all-audits', 'list-locales', 'list-trace-categories', 'additional-trace-categories',
       'config-path', 'preset', 'chrome-flags', 'port', 'hostname', 'form-factor', 'screenEmulation', 'emulatedUserAgent',
       'max-wait-for-load', 'enable-error-reporting', 'gather-mode', 'audit-mode',
-      'only-audits', 'only-categories', 'skip-audits', 'budget-path',
+      'only-audits', 'only-categories', 'skip-audits', 'budget-path', 'disable-full-page-screenshot',
     ], 'Configuration:')
 
     // Output
@@ -227,6 +227,7 @@ function getYargsParser(manualArgv) {
       },
       'output-path': {
         type: 'string',
+        coerce: coerceOutputPath,
         describe: `The file path to output the results. Use 'stdout' to write to stdout.
 If using JSON output, default is stdout.
 If using HTML or CSV output, default is a file in the working directory with a name based on the test URL and date.
@@ -315,7 +316,7 @@ Example: --output-path=./lighthouse-results.html`,
       //   - We're just printing the config.
       //   - We're in auditMode (and we have artifacts already)
       // If one of these don't apply, if no URL, stop the program and ask for one.
-      const isPrintSomethingMode = argv.listAllAudits || argv.listLocales || argv.listTraceCategories || argv.printConfig;
+      const isPrintSomethingMode = argv.listAllAudits || argv.listLocales || argv.listTraceCategories;
       const isOnlyAuditMode = !!argv.auditMode && !argv.gatherMode;
       if (isPrintSomethingMode || isOnlyAuditMode) {
         return true;
@@ -349,7 +350,7 @@ function getFlags(manualArgv, options = {}) {
   // Augmenting yargs type with auto-camelCasing breaks in tsc@4.1.2 and @types/yargs@15.0.11,
   // so for now cast to add yarg's camelCase properties to type.
   const argv = /** @type {Awaited<typeof parser.argv>} */ (parser.argv);
-  const cliFlags = /** @type {typeof argv & CamelCasify<typeof argv>} */ (argv);
+  const cliFlags = /** @type {typeof argv & LH.Util.CamelCasify<typeof argv>} */ (argv);
 
   // yargs will return `undefined` for options that have a `coerce` function but
   // are not actually present in the user input. Instead of passing properties
@@ -406,6 +407,21 @@ function coerceOutput(values) {
   });
 
   return validValues;
+}
+
+/**
+ * Verifies outputPath is something we can actually write to.
+ * @param {unknown=} value
+ * @return {string=}
+ */
+function coerceOutputPath(value) {
+  if (value === undefined) return;
+
+  if (typeof value !== 'string' || !value || !fs.existsSync(path.dirname(value))) {
+    throw new Error(`--output-path (${value}) cannot be written to`);
+  }
+
+  return value;
 }
 
 /**

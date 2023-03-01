@@ -6,12 +6,12 @@
 
 // node core/scripts/print-a11y-scoring.js
 
-import {initializeConfig} from '../fraggle-rock/config/config.js';
+import {initializeConfig} from '../config/config.js';
 
-const {config} = await initializeConfig(undefined, {gatherMode: 'navigation'});
-if (!config.categories || !config.audits) throw new Error('wut');
+const {resolvedConfig} = await initializeConfig('navigation');
+if (!resolvedConfig.categories || !resolvedConfig.audits) throw new Error('wut');
 
-const auditRefs = config.categories.accessibility.auditRefs;
+const auditRefs = resolvedConfig.categories.accessibility.auditRefs;
 const sum = auditRefs.reduce((sum, item) => sum += item.weight, 0);
 const result = auditRefs
   .filter(a => a.weight)

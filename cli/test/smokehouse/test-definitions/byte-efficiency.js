@@ -5,7 +5,7 @@
  */
 
 /**
- * @type {LH.Config.Json}
+ * @type {LH.Config}
  * Config file for running byte efficiency smokehouse audits.
  */
 const config = {
@@ -158,7 +158,7 @@ const expectations = {
   },
   lhr: {
     requestedUrl: 'http://localhost:10200/byte-efficiency/tester.html',
-    finalUrl: 'http://localhost:10200/byte-efficiency/tester.html',
+    finalDisplayedUrl: 'http://localhost:10200/byte-efficiency/tester.html',
     audits: {
       'uses-http2': {
         score: 1,
@@ -303,13 +303,13 @@ const expectations = {
       // Check that images aren't TOO BIG.
       'uses-responsive-images': {
         details: {
-          overallSavingsBytes: '113000 +/- 5000',
+          overallSavingsBytes: '169000 +/- 5000',
           items: [
-            {wastedPercent: '56 +/- 5', url: /lighthouse-1024x680.jpg/},
-            {wastedPercent: '78 +/- 5', url: /lighthouse-2048x1356.webp\?size0/},
-            {wastedPercent: '56 +/- 5', url: /lighthouse-480x320.webp/},
-            {wastedPercent: '20 +/- 5', url: /lighthouse-480x320.jpg/},
-            {wastedPercent: '20 +/- 5', url: /lighthouse-480x320\.jpg\?attributesized/},
+            {wastedPercent: '81 +/- 5', url: /lighthouse-1024x680.jpg/},
+            {wastedPercent: '88 +/- 5', url: /lighthouse-2048x1356.webp\?size0/},
+            {wastedPercent: '65 +/- 5', url: /lighthouse-480x320.jpg/},
+            {wastedPercent: '65 +/- 5', url: /lighthouse-480x320\.jpg\?attributesized/},
+            {wastedPercent: '81 +/- 5', url: /lighthouse-480x320.webp/},
           ],
         },
       },

@@ -6,7 +6,7 @@
 
 const BASE_URL = 'http://localhost:10200/seo/';
 
-/** @type {LH.Config.Json} */
+/** @type {LH.Config} */
 const config = {
   extends: 'lighthouse:default',
   settings: {
@@ -117,7 +117,7 @@ const expectedGatheredTapTargets = [
  */
 const expectations = {
   lhr: {
-    finalUrl: BASE_URL + 'seo-tap-targets.html',
+    finalDisplayedUrl: BASE_URL + 'seo-tap-targets.html',
     requestedUrl: BASE_URL + 'seo-tap-targets.html',
     audits: {
       'tap-targets': {

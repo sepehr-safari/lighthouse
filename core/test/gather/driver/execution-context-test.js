@@ -13,8 +13,6 @@ import {
   timers,
 } from '../../test-utils.js';
 
-timers.useFakeTimers();
-
 // This can be removed when FR becomes the default.
 const createMockSendCommandFn =
   mockCommands.createMockSendCommandFn.bind(null, {useSessionId: false});
@@ -46,7 +44,7 @@ describe('ExecutionContext', () => {
       executionContext._session.sendCommand = createMockSendCommandFn()
         .mockResponse('Page.enable')
         .mockResponse('Runtime.enable')
-        .mockResponse('Page.getResourceTree', {frameTree: {frame: {id: '1337'}}})
+        .mockResponse('Page.getFrameTree', {frameTree: {frame: {id: '1337'}}})
         .mockResponse('Page.createIsolatedWorld', {executionContextId})
         .mockResponse('Runtime.evaluate', {result: {value: 2}});
 
@@ -89,6 +87,9 @@ describe('ExecutionContext', () => {
 });
 
 describe('.evaluateAsync', () => {
+  before(() => timers.useFakeTimers());
+  after(() => timers.dispose());
+
   /** @type {LH.Gatherer.FRProtocolSession} */
   let sessionMock;
   /** @type {ExecutionContext} */
@@ -143,7 +144,7 @@ describe('.evaluateAsync', () => {
     let sendCommand = (sessionMock.sendCommand = createMockSendCommandFn()
       .mockResponse('Page.enable')
       .mockResponse('Runtime.enable')
-      .mockResponse('Page.getResourceTree', {frameTree: {frame: {id: '1337'}}})
+      .mockResponse('Page.getFrameTree', {frameTree: {frame: {id: '1337'}}})
       .mockResponse('Page.createIsolatedWorld', {executionContextId: 1})
       .mockResponse('Runtime.evaluate', {result: {value: 2}}));
 
@@ -174,12 +175,12 @@ describe('.evaluateAsync', () => {
     sessionMock.sendCommand = createMockSendCommandFn()
       .mockResponse('Page.enable')
       .mockResponse('Runtime.enable')
-      .mockResponse('Page.getResourceTree', {frameTree: {frame: {id: '1337'}}})
+      .mockResponse('Page.getFrameTree', {frameTree: {frame: {id: '1337'}}})
       .mockResponse('Page.createIsolatedWorld', {executionContextId: 9001})
       .mockResponse('Runtime.evaluate', Promise.reject(new Error('Cannot find context')))
       .mockResponse('Page.enable')
       .mockResponse('Runtime.enable')
-      .mockResponse('Page.getResourceTree', {frameTree: {frame: {id: '1337'}}})
+      .mockResponse('Page.getFrameTree', {frameTree: {frame: {id: '1337'}}})
       .mockResponse('Page.createIsolatedWorld', {executionContextId: 9002})
       .mockResponse('Runtime.evaluate', {result: {value: 'mocked value'}});
 
@@ -218,7 +219,8 @@ describe('.evaluate', () => {
 const URL = globalThis.__nativeURL || globalThis.URL;
 const performance = globalThis.__nativePerformance || globalThis.performance;
 const fetch = globalThis.__nativeFetch || globalThis.fetch;
-        globalThis.__lighthouseExecutionContextId = undefined;
+        globalThis.__lighthouseExecutionContextUniqueIdentifier =
+          undefined;
         return new Promise(function (resolve) {
           return Promise.resolve()
             .then(_ => (() => {

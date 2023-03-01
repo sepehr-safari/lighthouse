@@ -15,8 +15,9 @@
  * limitations under the License.
  */
 
-import {Util} from './util.js';
 import {CategoryRenderer} from './category-renderer.js';
+import {ReportUtils} from './report-utils.js';
+import {Globals} from './report-globals.js';
 
 export class PwaCategoryRenderer extends CategoryRenderer {
   /**
@@ -101,7 +102,7 @@ export class PwaCategoryRenderer extends CategoryRenderer {
 
     // Remove any that have a failing audit.
     for (const auditRef of auditRefs) {
-      if (!Util.showAsPassed(auditRef.result) && auditRef.group) {
+      if (!ReportUtils.showAsPassed(auditRef.result) && auditRef.group) {
         uniqueGroupIds.delete(auditRef.group);
       }
     }
@@ -122,7 +123,7 @@ export class PwaCategoryRenderer extends CategoryRenderer {
     for (const groupId of groupIds) {
       const groupAuditRefs = auditRefs.filter(ref => ref.group === groupId);
       const auditCount = groupAuditRefs.length;
-      const passedCount = groupAuditRefs.filter(ref => Util.showAsPassed(ref.result)).length;
+      const passedCount = groupAuditRefs.filter(ref => ReportUtils.showAsPassed(ref.result)).length;
 
       const title = groupDefinitions[groupId].title;
       tips.push(`${title}: ${passedCount}/${auditCount}`);
@@ -162,7 +163,7 @@ export class PwaCategoryRenderer extends CategoryRenderer {
     const defsEl = svgRoot.querySelector('defs');
     if (!defsEl) return;
 
-    const idSuffix = Util.getUniqueSuffix();
+    const idSuffix = Globals.getUniqueSuffix();
     const elementsToUpdate = defsEl.querySelectorAll('[id]');
     for (const el of elementsToUpdate) {
       const oldId = el.id;

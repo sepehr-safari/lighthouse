@@ -62,7 +62,7 @@ enum LighthouseError {
 }
 
 // The overarching Lighthouse Response object (LHR)
-// https://github.com/GoogleChrome/lighthouse/blob/master/types/lhr.d.ts
+// https://github.com/GoogleChrome/lighthouse/blob/main/types/lhr.d.ts
 message LighthouseResult {
   // The timestamp of when the results were generated.
   google.protobuf.Timestamp fetch_time = 1;
@@ -126,14 +126,14 @@ message LighthouseResult {
   map<string, CategoryGroup> category_groups = 11;
 
   // Message containing the configuration settings for the LH run
-  // Next ID: 9
+  // Next ID: 10
   message ConfigSettings {
     // The possible form factors an audit can be run in.
     // This enum served the emulated_form_factor field, but in v7, that field
     // was deprecated. Meanwhile in v7, the form_factor field was added and has
     // a mobile/desktop enum, so we simplify reuse, minus the `none` option.
     // See
-    // https://github.com/GoogleChrome/lighthouse/blob/master/docs/emulation.md#changes-made-in-v7
+    // https://github.com/GoogleChrome/lighthouse/blob/main/docs/emulation.md#changes-made-in-v7
     enum EmulatedFormFactor {
       UNKNOWN_FORM_FACTOR = 0;
       mobile = 1;
@@ -185,6 +185,22 @@ message LighthouseResult {
 
     // The method used to throttle the network.
     string throttling_method = 8;
+
+    message ScreenEmulation {
+      // Overriding width value in pixels (minimum 0, maximum 10000000). 0 disables the override.
+      double width = 1;
+      // Overriding height value in pixels (minimum 0, maximum 10000000). 0 disables the override.
+      double height = 2;
+      // Overriding device scale factor value. 0 disables the override.
+      double deviceScaleFactor = 3;
+      // Whether to emulate mobile device. This includes viewport meta tag, overlay scrollbars, text autosizing and more.
+      bool mobile = 4;
+      // Whether screen emulation is disabled. If true, the other emulation settings are ignored.
+      bool disabled = 5;
+    }
+
+    // Screen emulation properties (width, height, dpr, mobile viewport) to apply or an object of `{disabled: true}` if Lighthouse should avoid applying screen emulation. If either emulation is applied outside of Lighthouse, or it's being run on a mobile device, it typically should be set to disabled. For desktop, we recommend applying consistent desktop screen emulation.
+    ScreenEmulation screen_emulation = 9;
   }
 
   // The settings that were used to run this audit
@@ -223,6 +239,18 @@ message LighthouseResult {
 
   // Gather mode used to collect artifacts.
   string gather_mode = 16;
+
+  // URL of the main document request of the final navigation.
+  string main_document_url = 17;
+
+  // URL displayed on the page after Lighthouse finishes.
+  string final_displayed_url = 18;
+
+  // Screenshot data of the full page, along with node rects relevant to the audit results.
+  google.protobuf.Value full_page_screenshot = 19;
+
+  // Entity classification data.
+  repeated LhrEntity entities = 20;
 }
 
 // Message containing a category
@@ -573,6 +601,9 @@ message I18n {
 
     // This label is for a button that will show the user a trace of the page.
     string view_original_trace_label = 59;
+
+    // Label for a row in a table that shows the screen emulation used
+    string runtime_settings_screen_emulation = 60;
   }
 
   // The message holding all formatted strings used in the renderer.
@@ -597,4 +628,25 @@ message StackPack {
 
   // Map of audit-ids to Stack Pack descriptions.
   map<string, string> descriptions = 4;
+}
+
+// Message containing an Entity.
+message LhrEntity {
+  // Name of the entity.
+  string name = 1;
+
+  // An optional homepage URL of the entity.
+  optional string homepage = 2;
+
+  // An optional category name for the entity.
+  optional string category = 3;
+
+  // An optional flag indicating if the entity is the first party.
+  optional bool isFirstParty = 4;
+
+  // An optional flag indicating if the entity is not recognized.
+  optional bool isUnrecognized = 5;
+
+  // A list of URL origin strings that belong to this entity.
+  repeated string origins = 6;
 }

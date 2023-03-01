@@ -3,9 +3,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
-'use strict';
 
 import log from 'lighthouse-logger';
+
 import * as storage from './storage.js';
 import * as emulation from '../../lib/emulation.js';
 import {pageFunctions} from '../../lib/page-functions.js';
@@ -22,17 +22,33 @@ async function enableAsyncStacks(session) {
     await session.sendCommand('Debugger.setAsyncCallStackDepth', {maxDepth: 8});
   };
 
-  // Resume any pauses that make it through `setSkipAllPauses`
-  session.on('Debugger.paused', () => session.sendCommand('Debugger.resume'));
+  /**
+   * Resume any pauses that make it through `setSkipAllPauses`
+   */
+  function onDebuggerPaused() {
+    session.sendCommand('Debugger.resume');
+  }
 
-  // `Debugger.setSkipAllPauses` is reset after every navigation, so retrigger it on main frame navigations.
-  // See https://bugs.chromium.org/p/chromium/issues/detail?id=990945&q=setSkipAllPauses&can=2
-  session.on('Page.frameNavigated', event => {
+  /**
+   * `Debugger.setSkipAllPauses` is reset after every navigation, so retrigger it on main frame navigations.
+   * See https://bugs.chromium.org/p/chromium/issues/detail?id=990945&q=setSkipAllPauses&can=2
+   * @param {LH.Crdp.Page.FrameNavigatedEvent} event
+   */
+  function onFrameNavigated(event) {
     if (event.frame.parentId) return;
     enable().catch(err => log.error('Driver', err));
-  });
+  }
+
+  session.on('Debugger.paused', onDebuggerPaused);
+  session.on('Page.frameNavigated', onFrameNavigated);
 
   await enable();
+
+  return async () => {
+    await session.sendCommand('Debugger.disable');
+    session.off('Debugger.paused', onDebuggerPaused);
+    session.off('Page.frameNavigated', onFrameNavigated);
+  };
 }
 
 /**
@@ -70,6 +86,7 @@ async function dismissJavaScriptDialogs(session) {
 }
 
 /**
+ * Reset the storage and warn if any stored data could be affecting the scores.
  * @param {LH.Gatherer.FRProtocolSession} session
  * @param {string} url
  * @return {Promise<{warnings: Array<LH.IcuMessage>}>}
@@ -78,11 +95,14 @@ async function resetStorageForUrl(session, url) {
   /** @type {Array<LH.IcuMessage>} */
   const warnings = [];
 
-  // Reset the storage and warn if there appears to be other important data.
-  const warning = await storage.getImportantStorageWarning(session, url);
-  if (warning) warnings.push(warning);
-  await storage.clearDataForOrigin(session, url);
-  await storage.clearBrowserCaches(session);
+  const importantStorageWarning = await storage.getImportantStorageWarning(session, url);
+  if (importantStorageWarning) warnings.push(importantStorageWarning);
+
+  const clearDataWarnings = await storage.clearDataForOrigin(session, url);
+  warnings.push(...clearDataWarnings);
+
+  const clearCacheWarnings = await storage.clearBrowserCaches(session);
+  warnings.push(...clearCacheWarnings);
 
   return {warnings};
 }
@@ -124,15 +144,12 @@ async function prepareThrottlingAndNetwork(session, settings, options) {
  * @param {LH.Gatherer.FRTransitionalDriver} driver
  * @param {LH.Config.Settings} settings
  */
-async function prepareDeviceEmulationAndAsyncStacks(driver, settings) {
+async function prepareDeviceEmulation(driver, settings) {
   // Enable network domain here so future calls to `emulate()` don't clear cache (https://github.com/GoogleChrome/lighthouse/issues/12631)
   await driver.defaultSession.sendCommand('Network.enable');
 
   // Emulate our target device screen and user agent.
   await emulation.emulate(driver.defaultSession, settings);
-
-  // Enable better stacks on network requests.
-  await enableAsyncStacks(driver.defaultSession);
 }
 
 /**
@@ -145,7 +162,7 @@ async function prepareTargetForTimespanMode(driver, settings) {
   const status = {msg: 'Preparing target for timespan mode', id: 'lh:prepare:timespanMode'};
   log.time(status);
 
-  await prepareDeviceEmulationAndAsyncStacks(driver, settings);
+  await prepareDeviceEmulation(driver, settings);
   await prepareThrottlingAndNetwork(driver.defaultSession, settings, {
     disableThrottling: false,
     blockedUrlPatterns: undefined,
@@ -167,7 +184,7 @@ async function prepareTargetForNavigationMode(driver, settings) {
   const status = {msg: 'Preparing target for navigation mode', id: 'lh:prepare:navigationMode'};
   log.time(status);
 
-  await prepareDeviceEmulationAndAsyncStacks(driver, settings);
+  await prepareDeviceEmulation(driver, settings);
 
   // Automatically handle any JavaScript dialogs to prevent a hung renderer.
   await dismissJavaScriptDialogs(driver.defaultSession);
@@ -223,4 +240,5 @@ export {
   prepareTargetForTimespanMode,
   prepareTargetForNavigationMode,
   prepareTargetForIndividualNavigation,
+  enableAsyncStacks,
 };

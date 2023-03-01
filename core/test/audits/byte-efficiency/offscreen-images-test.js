@@ -4,7 +4,7 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-import {strict as assert} from 'assert';
+import assert from 'assert/strict';
 
 import UnusedImages from '../../../audits/byte-efficiency/offscreen-images.js';
 import {createTestTrace} from '../../create-test-trace.js';
@@ -13,13 +13,13 @@ import {networkRecordsToDevtoolsLog} from '../../network-records-to-devtools-log
 function generateRecord({
   resourceSizeInKb,
   url = 'https://google.com/logo.png',
-  startTime = 0,
+  networkRequestTime = 0,
   mimeType = 'image/png',
 }) {
   return {
     url,
     mimeType,
-    startTime, // DevTools timestamp which is in seconds.
+    networkRequestTime,
     resourceSize: resourceSizeInKb * 1024,
     transferSize: resourceSizeInKb * 1024,
   };
@@ -359,7 +359,7 @@ describe('OffscreenImages audit', () => {
 
   it('disregards images loaded after TTI', () => {
     const topLevelTasks = [{ts: 1900, duration: 100}];
-    const networkRecord = generateRecord({resourceSizeInKb: 100, startTime: 3});
+    const networkRecord = generateRecord({resourceSizeInKb: 100, networkRequestTime: 3000});
     const artifacts = {
       ViewportDimensions: DEFAULT_DIMENSIONS,
       GatherContext: {gatherMode: 'navigation'},
@@ -377,7 +377,7 @@ describe('OffscreenImages audit', () => {
   });
 
   it('disregards images loaded after Trace End when interactive throws error', () => {
-    const networkRecord = generateRecord({resourceSizeInKb: 100, startTime: 3});
+    const networkRecord = generateRecord({resourceSizeInKb: 100, networkRequestTime: 3000});
     const artifacts = {
       ViewportDimensions: DEFAULT_DIMENSIONS,
       GatherContext: {gatherMode: 'navigation'},
@@ -420,7 +420,7 @@ describe('OffscreenImages audit', () => {
       resourceSize: wastedSize,
       transferSize: wastedSize,
       requestId: 'a',
-      startTime: 1,
+      networkRequestTime: 1000,
       priority: 'High',
       timing: {receiveHeadersEnd: 1.25},
     };
@@ -429,7 +429,7 @@ describe('OffscreenImages audit', () => {
       resourceSize: wastedSize,
       transferSize: wastedSize,
       requestId: 'b',
-      startTime: 2.25,
+      networkRequestTime: 2_250,
       priority: 'High',
       timing: {receiveHeadersEnd: 2.5},
     };
@@ -460,10 +460,9 @@ describe('OffscreenImages audit', () => {
       traces: {defaultPass: createTestTrace({topLevelTasks})},
       devtoolsLogs: {defaultPass: devtoolsLog},
       URL: {
-        initialUrl: 'about:blank',
         requestedUrl: recordA.url,
         mainDocumentUrl: recordA.url,
-        finalUrl: recordA.url,
+        finalDisplayedUrl: recordA.url,
       },
     };
 
@@ -482,7 +481,7 @@ describe('OffscreenImages audit', () => {
       resourceSize: wastedSize,
       transferSize: wastedSize,
       requestId: 'a',
-      startTime: 1,
+      networkRequestTime: 1000,
       priority: 'High',
       timing: {receiveHeadersEnd: 1.25},
     };
@@ -491,7 +490,7 @@ describe('OffscreenImages audit', () => {
       resourceSize: wastedSize,
       transferSize: wastedSize,
       requestId: 'b',
-      startTime: 1.25,
+      networkRequestTime: 1_250,
       priority: 'High',
       timing: {receiveHeadersEnd: 1.5},
     };
@@ -525,10 +524,9 @@ describe('OffscreenImages audit', () => {
       traces: {defaultPass: createTestTrace({topLevelTasks})},
       devtoolsLogs: {defaultPass: devtoolsLog},
       URL: {
-        initialUrl: 'about:blank',
         requestedUrl: recordA.url,
         mainDocumentUrl: recordA.url,
-        finalUrl: recordA.url,
+        finalDisplayedUrl: recordA.url,
       },
     };
 
@@ -544,8 +542,8 @@ describe('OffscreenImages audit', () => {
   it('rethrow error when interactive throws error in Lantern', async () => {
     context = {settings: {throttlingMethod: 'simulate'}, computedCache: new Map()};
     const networkRecords = [
-      generateRecord({url: 'a', resourceSizeInKb: 100, startTime: 3}),
-      generateRecord({url: 'b', resourceSizeInKb: 100, startTime: 4}),
+      generateRecord({url: 'a', resourceSizeInKb: 100, networkRequestTime: 3000}),
+      generateRecord({url: 'b', resourceSizeInKb: 100, networkRequestTime: 4000}),
     ];
     const artifacts = {
       ViewportDimensions: DEFAULT_DIMENSIONS,
@@ -585,7 +583,7 @@ describe('OffscreenImages audit', () => {
       resourceSize: wastedSize,
       transferSize: 0,
       requestId: 'a',
-      startTime: 1,
+      networkRequestTime: 1000,
       priority: 'High',
       timing: {receiveHeadersEnd: 1.25},
     };

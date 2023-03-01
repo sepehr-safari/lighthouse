@@ -105,6 +105,8 @@ function findDifferences(path, actual, expected) {
 
   /** @type {Difference[]} */
   const diffs = [];
+
+  /** @type {any[]|undefined} */
   let inclExclCopy;
 
   // We only care that all expected's own properties are on actual (and not the other way around).
@@ -116,15 +118,20 @@ function findDifferences(path, actual, expected) {
     const expectedValue = expected[key];
 
     if (key === '_includes') {
-      inclExclCopy = [...actual];
+      if (Array.isArray(actual)) {
+        inclExclCopy = [...actual];
+      } else if (typeof actual === 'object') {
+        inclExclCopy = Object.entries(actual);
+      }
 
       if (!Array.isArray(expectedValue)) throw new Error('Array subset must be array');
-      if (!Array.isArray(actual)) {
+      if (!inclExclCopy) {
         diffs.push({
           path,
-          actual: 'Actual value is not an array',
+          actual: 'Actual value is not an array or object',
           expected,
         });
+        continue;
       }
 
       for (const expectedEntry of expectedValue) {
@@ -148,20 +155,33 @@ function findDifferences(path, actual, expected) {
 
     if (key === '_excludes') {
       // Re-use state from `_includes` check, if there was one.
-      /** @type {any[]} */
-      const arrToCheckAgainst = inclExclCopy || actual;
+      if (!inclExclCopy) {
+        if (Array.isArray(actual)) {
+          // We won't be removing items, so we can just copy the reference.
+          inclExclCopy = actual;
+        } else if (typeof actual === 'object') {
+          inclExclCopy = Object.entries(actual);
+        }
+      }
 
       if (!Array.isArray(expectedValue)) throw new Error('Array subset must be array');
-      if (!Array.isArray(actual)) continue;
+      if (!inclExclCopy) {
+        diffs.push({
+          path,
+          actual: 'Actual value is not an array or object',
+          expected,
+        });
+        continue;
+      }
 
       const expectedExclusions = expectedValue;
       for (const expectedExclusion of expectedExclusions) {
-        const matchingIndex = arrToCheckAgainst.findIndex(actualEntry =>
+        const matchingIndex = inclExclCopy.findIndex(actualEntry =>
             !findDifferences(keyPath, actualEntry, expectedExclusion));
         if (matchingIndex !== -1) {
           diffs.push({
             path,
-            actual: arrToCheckAgainst[matchingIndex],
+            actual: inclExclCopy[matchingIndex],
             expected: {
               message: 'Expected to not find matching entry via _excludes',
               expectedExclusion,
@@ -371,30 +391,34 @@ function collateResults(localConsole, actual, expected) {
     return makeComparison(auditName + ' audit', actualResult, expectedResult);
   });
 
-  const timingAssertions = [];
+  /** @type {Comparison[]} */
+  const extraAssertions = [];
+
   if (expected.lhr.timing) {
     const comparison = makeComparison('timing', actual.lhr.timing, expected.lhr.timing);
-    timingAssertions.push(comparison);
+    extraAssertions.push(comparison);
   }
 
-  /** @type {Comparison[]} */
-  const requestCountAssertion = [];
   if (expected.networkRequests) {
-    requestCountAssertion.push(makeComparison(
+    extraAssertions.push(makeComparison(
       'Requests',
       actual.networkRequests,
       expected.networkRequests
     ));
   }
 
+  if (expected.lhr.fullPageScreenshot) {
+    extraAssertions.push(makeComparison('fullPageScreenshot', actual.lhr.fullPageScreenshot,
+      expected.lhr.fullPageScreenshot));
+  }
+
   return [
-    makeComparison('final url', actual.lhr.finalUrl, expected.lhr.finalUrl),
+    makeComparison('final url', actual.lhr.finalDisplayedUrl, expected.lhr.finalDisplayedUrl),
     runtimeErrorAssertion,
     runWarningsAssertion,
-    ...requestCountAssertion,
     ...artifactAssertions,
     ...auditAssertions,
-    ...timingAssertions,
+    ...extraAssertions,
   ];
 }
 

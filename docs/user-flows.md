@@ -40,29 +40,27 @@ In DevTools, navigation is easy: ensure it's the selected mode and then click _A
 ```js
 import {writeFileSync} from 'fs';
 import puppeteer from 'puppeteer';
-import lighthouse from 'lighthouse/core/fraggle-rock/api.js';
+import {startFlow} from 'lighthouse';
 
-(async function() {
-  const browser = await puppeteer.launch();
-  const page = await browser.newPage();
-  const flow = await lighthouse.startFlow(page);
+const browser = await puppeteer.launch();
+const page = await browser.newPage();
+const flow = await startFlow(page);
 
-  // Navigate with a URL
-  await flow.navigate('https://example.com');
+// Navigate with a URL
+await flow.navigate('https://example.com');
 
-  // Interaction-initiated navigation via a callback function
-  await flow.navigate(async () => {
-    await page.click('a.link');
-  });
-
-  // Navigate with startNavigation/endNavigation
-  await flow.startNavigation();
+// Interaction-initiated navigation via a callback function
+await flow.navigate(async () => {
   await page.click('a.link');
-  await flow.endNavigation();
+});
 
-  await browser.close();
-  writeFileSync('report.html', await flow.generateReport());
-})();
+// Navigate with startNavigation/endNavigation
+await flow.startNavigation();
+await page.click('a.link');
+await flow.endNavigation();
+
+await browser.close();
+writeFileSync('report.html', await flow.generateReport());
 ```
 </details>
 <br>
@@ -90,23 +88,21 @@ In DevTools, select "Timespan" as the mode and click _Start timespan_. Record wh
 ```js
 import {writeFileSync} from 'fs';
 import puppeteer from 'puppeteer';
-import lighthouse from 'lighthouse/core/fraggle-rock/api.js';
+import {startFlow} from 'lighthouse';
 
-(async function() {
-  const browser = await puppeteer.launch();
-  const page = await browser.newPage();
-  await page.goto('https://secret.login');
-  const flow = await lighthouse.startFlow(page);
+const browser = await puppeteer.launch();
+const page = await browser.newPage();
+await page.goto('https://secret.login');
+const flow = await startFlow(page);
 
-  await flow.beginTimespan();
-  await page.type('#password', 'L1ghth0useR0cks!');
-  await page.click('#login');
-  await page.waitForSelector('#dashboard');
-  await flow.endTimespan();
+await flow.startTimespan();
+await page.type('#password', 'L1ghth0useR0cks!');
+await page.click('#login');
+await page.waitForSelector('#dashboard');
+await flow.endTimespan();
 
-  await browser.close();
-  writeFileSync('report.html', await flow.generateReport());
-})();
+await browser.close();
+writeFileSync('report.html', await flow.generateReport());
 ```
 </details>
 <br>
@@ -125,20 +121,18 @@ In DevTools, select "Snapshot" as the mode. Set up the page in the state you wan
 ```js
 import {writeFileSync} from 'fs';
 import puppeteer from 'puppeteer';
-import lighthouse from 'lighthouse/core/fraggle-rock/api.js';
+import {startFlow} from 'lighthouse';
 
-(async function() {
-  const browser = await puppeteer.launch();
-  const page = await browser.newPage();
-  await page.goto('https://example.com');
-  const flow = await lighthouse.startFlow(page);
+const browser = await puppeteer.launch();
+const page = await browser.newPage();
+await page.goto('https://example.com');
+const flow = await startFlow(page);
 
-  await page.click('#expand-sidebar');
-  await flow.snapshot();
+await page.click('#expand-sidebar');
+await flow.snapshot();
 
-  await browser.close();
-  writeFileSync('report.html', await flow.generateReport());
-})();
+await browser.close();
+writeFileSync('report.html', await flow.generateReport());
 ```
 </details>
 <br>
@@ -164,7 +158,7 @@ The below example codifies a user flow for an ecommerce site where the user navi
 import {writeFileSync} from 'fs';
 import puppeteer from 'puppeteer';
 import * as pptrTestingLibrary from 'pptr-testing-library';
-import lighthouse from 'lighthouse/core/fraggle-rock/api.js';
+import {startFlow} from 'lighthouse';
 
 const {getDocument, queries} = pptrTestingLibrary;
 
@@ -178,47 +172,93 @@ async function search(page) {
   ]);
 }
 
-(async function() {
-  // Setup the browser and Lighthouse.
-  const browser = await puppeteer.launch();
-  const page = await browser.newPage();
-  const flow = await lighthouse.startFlow(page);
+// Setup the browser and Lighthouse.
+const browser = await puppeteer.launch();
+const page = await browser.newPage();
+const flow = await startFlow(page);
 
-  // Phase 1 - Navigate to the landing page.
-  await flow.navigate('https://www.bestbuy.com');
+// Phase 1 - Navigate to the landing page.
+await flow.navigate('https://www.bestbuy.com');
 
-  // Phase 2 - Interact with the page and submit the search form.
-  await flow.startTimespan();
-  await search(page);
-  await flow.endTimespan();
+// Phase 2 - Interact with the page and submit the search form.
+await flow.startTimespan();
+await search(page);
+await flow.endTimespan();
 
-  // Phase 3 - Analyze the new state.
-  await flow.snapshot();
+// Phase 3 - Analyze the new state.
+await flow.snapshot();
 
-  // Phase 4 - Navigate to a detail page.
-  await flow.navigate(async () => {
-    const $document = await getDocument(page);
-    const $link = await queries.getByText($document, /Xbox Series X 1TB Console/);
-    $link.click();
-  });
+// Phase 4 - Navigate to a detail page.
+await flow.navigate(async () => {
+  const $document = await getDocument(page);
+  const $link = await queries.getByText($document, /Xbox Series X 1TB Console/);
+  $link.click();
+});
 
-  // Get the comprehensive flow report.
-  writeFileSync('report.html', await flow.generateReport());
-  // Save results as JSON.
-  writeFileSync('flow-result.json', JSON.stringify(await flow.createFlowResult(), null, 2));
+// Get the comprehensive flow report.
+writeFileSync('report.html', await flow.generateReport());
+// Save results as JSON.
+writeFileSync('flow-result.json', JSON.stringify(await flow.createFlowResult(), null, 2));
 
-  // Cleanup.
-  await browser.close();
-})();
+// Cleanup.
+await browser.close();
 ```
 
 As this flow has multiple steps, the flow report summarizes everything and allows you to investigate each aspect in more detail.
 
 ![Full flow report screenshot](https://user-images.githubusercontent.com/39191/168932301-cfdbe812-db96-4c6d-b43b-fe5c31f9d192.png)
 
+### Creating a desktop user flow
+
+If you want to test the desktop version of a page with user flows, you can use the desktop config provided in the Lighthouse package, which includes desktop scoring and viewport/performance emulation.
+
+```js
+import puppeteer from 'puppeteer';
+import {startFlow, desktopConfig} from 'lighthouse';
+
+const browser = await puppeteer.launch();
+const page = await browser.newPage();
+
+const flow = await startFlow(page, {
+  config: desktopConfig,
+});
+
+await flow.navigate('https://example.com');
+```
+
+### Using Puppeteer's emulation settings in a user flow
+
+If you want to inherit the viewport settings set up by Puppeteer, you need to disable Lighthouse's viewport emulation in the `flags` option.
+
+If Puppeteer is emulating a desktop page make sure to use the `desktopConfig` so Lighthouse still scores the results as a desktop page.
+
+```js
+import puppeteer from 'puppeteer';
+import {startFlow, desktopConfig} from 'lighthouse';
+
+const browser = await puppeteer.launch();
+const page = await browser.newPage();
+
+const flow = await startFlow(page, {
+  // Puppeteer is emulating a desktop environment,
+  // so we should still use the desktop config.
+  //
+  // If Puppeteer is emulating a mobile device then we can remove the next line.
+  config: desktopConfig,
+  // `flags` will override the Lighthouse emulation settings
+  // to prevent Lighthouse from changing the screen dimensions.
+  flags: {screenEmulation: {disabled: true}},
+});
+
+await page.setViewport({width: 1000, height: 500});
+
+await flow.navigate('https://example.com');
+```
+
 ## Tips and Tricks
 
 - Keep timespan recordings _short_ and focused on a single interaction sequence or page transition.
+- Always audit page navigations with navigation mode, avoid auditing hard page navigations with timespan mode.
 - Use snapshot recordings when a substantial portion of the page content has changed.
 - Always wait for transitions and interactions to finish before ending a timespan. The puppeteer APIs `page.waitForSelector`/`page.waitForFunction`/`page.waitForResponse`/`page.waitForTimeout` are your friends here.
 

@@ -6,7 +6,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import {strict as assert} from 'assert';
+import assert from 'assert/strict';
 
 import ScreenshotThumbnailsAudit from '../../audits/screenshot-thumbnails.js';
 import {LH_ROOT} from '../../../root.js';
@@ -19,7 +19,7 @@ const noScreenshotsTrace = {traceEvents: pwaTrace.traceEvents.filter(e => e.name
 
 describe('Screenshot thumbnails', () => {
   it('should extract thumbnails from a trace', () => {
-    const options = {minimumTimelineDuration: 500};
+    const options = {minimumTimelineDuration: 500, numberOfThumbnails: 10, thumbnailWidth: 120};
     const settings = {throttlingMethod: 'provided'};
     const artifacts = {
       GatherContext: {gatherMode: 'timespan'},
@@ -83,8 +83,8 @@ describe('Screenshot thumbnails', () => {
 
     const context = {settings, options, computedCache: new Map()};
     return ScreenshotThumbnailsAudit.audit(artifacts, context).then(results => {
-      assert.equal(results.details.items[0].timing, 82);
-      assert.equal(results.details.items[9].timing, 818);
+      assert.equal(results.details.items[0].timing, 102);
+      assert.equal(results.details.items[7].timing, 818);
     });
   });
 
@@ -97,8 +97,8 @@ describe('Screenshot thumbnails', () => {
 
     const context = {settings, options: {}, computedCache: new Map()};
     return ScreenshotThumbnailsAudit.audit(artifacts, context).then(results => {
-      assert.equal(results.details.items[0].timing, 300);
-      assert.equal(results.details.items[9].timing, 3000);
+      assert.equal(results.details.items[0].timing, 375);
+      assert.equal(results.details.items[7].timing, 3000);
     });
   });
 

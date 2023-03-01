@@ -6,7 +6,7 @@
 
 const BASE_URL = 'http://localhost:10200/seo/';
 
-/** @type {LH.Config.Json} */
+/** @type {LH.Config} */
 const config = {
   extends: 'lighthouse:default',
   settings: {
@@ -42,7 +42,7 @@ const failureHeaders = headersParam([[
 const expectations = {
   lhr: {
     requestedUrl: BASE_URL + 'seo-failure-cases.html?' + failureHeaders,
-    finalUrl: BASE_URL + 'seo-failure-cases.html?' + failureHeaders,
+    finalDisplayedUrl: BASE_URL + 'seo-failure-cases.html?' + failureHeaders,
     audits: {
       'viewport': {
         score: 0,

@@ -4,7 +4,7 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-/** @type {LH.Config.Json} */
+/** @type {LH.Config} */
 const config = {
   extends: 'lighthouse:default',
   categories: {
@@ -26,15 +26,10 @@ const config = {
     // Be a little more forgiving on how long it takes all network requests of several nested iframes
     // to complete.
     maxWaitForLoad: 180000,
-  },
-  navigations: [
     // CI machines are pretty weak which lead to many more long tasks than normal.
     // Reduce our requirement for CPU quiet.
-    {
-      id: 'default',
-      cpuQuietThresholdMs: 500,
-    },
-  ],
+    cpuQuietThresholdMs: 500,
+  },
 };
 
 /**
@@ -44,7 +39,7 @@ const config = {
 const expectations = {
   lhr: {
     requestedUrl: 'http://localhost:10200/oopif-scripts.html',
-    finalUrl: 'http://localhost:10200/oopif-scripts.html',
+    finalDisplayedUrl: 'http://localhost:10200/oopif-scripts.html',
     audits: {
       'network-requests': {
         details: {

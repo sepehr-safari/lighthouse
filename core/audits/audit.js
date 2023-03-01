@@ -3,13 +3,25 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
-'use strict';
 
+import * as LH from '../../types/lh.js';
 import {isUnderTest} from '../lib/lh-env.js';
 import * as statistics from '../lib/statistics.js';
-import {Util} from '../util.cjs';
+import {Util} from '../../shared/util.js';
 
 const DEFAULT_PASS = 'defaultPass';
+
+/**
+ * @typedef TableOptions
+ * @property {number=} wastedMs
+ * @property {number=} wastedBytes
+ */
+
+/**
+ * @typedef OpportunityOptions
+ * @property {number} overallSavingsMs
+ * @property {number=} overallSavingsBytes
+ */
 
 /**
  * Clamp figure to 2 decimal places
@@ -123,10 +135,12 @@ class Audit {
   /**
    * @param {LH.Audit.Details.Table['headings']} headings
    * @param {LH.Audit.Details.Table['items']} results
-   * @param {LH.Audit.Details.Table['summary']=} summary
+   * @param {TableOptions=} options
    * @return {LH.Audit.Details.Table}
    */
-  static makeTableDetails(headings, results, summary) {
+  static makeTableDetails(headings, results, options = {}) {
+    const {wastedBytes, wastedMs} = options;
+    const summary = (wastedBytes || wastedMs) ? {wastedBytes, wastedMs} : undefined;
     if (results.length === 0) {
       return {
         type: 'table',
@@ -215,12 +229,12 @@ class Audit {
   /**
    * @param {LH.Audit.Details.Opportunity['headings']} headings
    * @param {LH.Audit.Details.Opportunity['items']} items
-   * @param {number} overallSavingsMs
-   * @param {number=} overallSavingsBytes
+   * @param {OpportunityOptions} options
    * @return {LH.Audit.Details.Opportunity}
    */
-  static makeOpportunityDetails(headings, items, overallSavingsMs, overallSavingsBytes) {
+  static makeOpportunityDetails(headings, items, options) {
     Audit.assertHeadingKeysExist(headings, items);
+    const {overallSavingsMs, overallSavingsBytes} = options;
 
     return {
       type: 'opportunity',

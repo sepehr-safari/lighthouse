@@ -3,9 +3,8 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
-'use strict';
 
-import URL from '../../url-shim.js';
+import UrlUtils from '../../url-utils.js';
 
 const INITIAL_CWD = 14 * 1024;
 
@@ -151,7 +150,7 @@ class NetworkAnalyzer {
       if (!Number.isFinite(timing.receiveHeadersEnd) || timing.receiveHeadersEnd < 0) return;
 
       // Compute the amount of time downloading everything after the first congestion window took
-      const totalTime = (record.endTime - record.startTime) * 1000;
+      const totalTime = record.networkEndTime - record.networkRequestTime;
       const downloadTimeAfterFirstByte = totalTime - timing.receiveHeadersEnd;
       const numberOfRoundTrips = Math.log2(record.transferSize / INITIAL_CWD);
 
@@ -280,17 +279,19 @@ class NetworkAnalyzer {
     const groupedByOrigin = NetworkAnalyzer.groupByOrigin(records);
     for (const [_, originRecords] of groupedByOrigin.entries()) {
       const earliestReusePossible = originRecords
-        .map(record => record.endTime)
+        .map(record => record.networkEndTime)
         .reduce((a, b) => Math.min(a, b), Infinity);
 
       for (const record of originRecords) {
         connectionWasReused.set(
           record.requestId,
-          record.startTime >= earliestReusePossible || record.protocol === 'h2'
+          record.networkRequestTime >= earliestReusePossible || record.protocol === 'h2'
         );
       }
 
-      const firstRecord = originRecords.reduce((a, b) => (a.startTime > b.startTime ? b : a));
+      const firstRecord = originRecords.reduce((a, b) => {
+        return a.networkRequestTime > b.networkRequestTime ? b : a;
+      });
       connectionWasReused.set(firstRecord.requestId, false);
     }
 
@@ -400,8 +401,8 @@ class NetworkAnalyzer {
 
       // If we've made it this far, all the times we need should be valid (i.e. not undefined/-1).
       totalBytes += record.transferSize;
-      boundaries.push({time: record.responseReceivedTime, isStart: true});
-      boundaries.push({time: record.endTime, isStart: false});
+      boundaries.push({time: record.responseHeadersEndTime / 1000, isStart: true});
+      boundaries.push({time: record.networkEndTime / 1000, isStart: false});
       return boundaries;
     }, /** @type {Array<{time: number, isStart: boolean}>} */([])).sort((a, b) => a.time - b.time);
 
@@ -441,7 +442,7 @@ class NetworkAnalyzer {
     // equalWithExcludedFragments is expensive, so check that the resourceUrl starts with the request url first
     return records.find(request =>
       resourceUrl.startsWith(request.url) &&
-      URL.equalWithExcludedFragments(request.url, resourceUrl)
+      UrlUtils.equalWithExcludedFragments(request.url, resourceUrl)
     );
   }
 

@@ -6,7 +6,7 @@
 
 /**
  * Config file for sites with various errors, just fail out quickly.
- * @type {LH.Config.Json}
+ * @type {LH.Config}
  */
 const config = {
   extends: 'lighthouse:default',
@@ -31,7 +31,7 @@ const NONEMPTY_ARRAY = {
 const expectations = {
   lhr: {
     requestedUrl: 'https://expired.badssl.com',
-    finalUrl: /(expired.badssl.com|chrome-error)/,
+    finalDisplayedUrl: /(expired.badssl.com|chrome-error)/,
     runtimeError: {code: 'INSECURE_DOCUMENT_REQUEST'},
     runWarnings: Object.defineProperty([
       /expired.badssl.*redirected to chrome-error:/, // This warning was not provided in legacy reports.

@@ -4,8 +4,8 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-import ProcessedTrace from '../../computed/processed-trace.js';
-import ProcessedNavigation from '../../computed/processed-navigation.js';
+import {ProcessedNavigation} from '../../computed/processed-navigation.js';
+import {ProcessedTrace} from '../../computed/processed-trace.js';
 import {readJson} from '../test-utils.js';
 
 const pwaTrace = readJson('../fixtures/traces/progressive-app-m60.json', import.meta);
@@ -15,8 +15,7 @@ const noNavStartTrace = readJson('../fixtures/traces/no_navstart_event.json', im
 describe('ProcessedTrace', () => {
   it('computes the artifact', async () => {
     const context = {computedCache: new Map()};
-    const processedTrace = await ProcessedTrace.request(pwaTrace, context);
-    const processedNavigation = await ProcessedNavigation.request(processedTrace, context);
+    const processedNavigation = await ProcessedNavigation.request(pwaTrace, context);
 
     expect(processedNavigation).toEqual({
       domContentLoadedEvt: {
@@ -119,11 +118,27 @@ describe('ProcessedTrace', () => {
     });
   });
 
+  it('accepts a processed trace as input', async () => {
+    const context = {computedCache: new Map()};
+    const processedTrace = await ProcessedTrace.request(pwaTrace, context);
+    const processedNavigation = await ProcessedNavigation.request(processedTrace, context);
+
+    expect(processedNavigation.timings).toEqual({
+      domContentLoaded: 560.294,
+      firstContentfulPaint: 498.87,
+      firstContentfulPaintAllFrames: 498.87,
+      firstMeaningfulPaint: 783.328,
+      firstPaint: 498.853,
+      load: 2198.898,
+      timeOrigin: 0,
+      traceEnd: 12539.872,
+    });
+  });
+
   it('fails with NO_NAVSTART', async () => {
     const context = {computedCache: new Map()};
     const compute = async () => {
-      const processedTrace = await ProcessedTrace.request(noNavStartTrace, context);
-      await ProcessedNavigation.request(processedTrace, context);
+      await ProcessedNavigation.request(noNavStartTrace, context);
     };
     await expect(compute()).rejects.toMatchObject({code: 'NO_NAVSTART'});
   });
@@ -132,8 +147,7 @@ describe('ProcessedTrace', () => {
     const context = {computedCache: new Map()};
 
     const compute = async () => {
-      const processedTrace = await ProcessedTrace.request(noFCPtrace, context);
-      await ProcessedNavigation.request(processedTrace, context);
+      await ProcessedNavigation.request(noFCPtrace, context);
     };
 
     await expect(compute()).rejects.toMatchObject({code: 'NO_FCP'});

@@ -32,6 +32,8 @@ last-run-results.html
 !core/test/results/artifacts/*.devtoolslog.json
 !core/test/fixtures/artifacts/**/*.trace.json
 !core/test/fixtures/artifacts/**/*.devtoolslog.json
+!core/test/fixtures/fraggle-rock/**/*.trace.json
+!core/test/fixtures/fraggle-rock/**/*.devtoolslog.json
 !core/test/fixtures/traces/**/*.trace.json
 !core/test/fixtures/traces/**/*.devtoolslog.json
 !core/test/fixtures/config/**/node_modules
@@ -59,4 +61,9 @@ proto/scripts/*_processed.json
 
 # require any lock file to be checked in explicitly
 yarn.lock
+
+# ignore generated d.ts files
+**/*.d.ts
+**/*.d.cts
+!**/types/**/*.d.ts
 

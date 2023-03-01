@@ -3,7 +3,6 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
-'use strict';
 
 /* global window */
 
@@ -14,7 +13,13 @@ import {ExecutionContext} from './execution-context.js';
 
 /** @typedef {InstanceType<import('./network-monitor.js')['NetworkMonitor']>} NetworkMonitor */
 /** @typedef {import('./network-monitor.js').NetworkMonitorEvent} NetworkMonitorEvent */
-/** @typedef {{promise: Promise<void>, cancel: function(): void}} CancellableWait */
+
+/**
+ * @template [T=void]
+ * @typedef CancellableWait
+ * @prop {Promise<T>} promise
+ * @prop {() => void} cancel
+ */
 
 /**
  * @typedef WaitOptions
@@ -41,7 +46,7 @@ function waitForNothing() {
  * Returns a promise that resolve when a frame has been navigated.
  * Used for detecting that our about:blank reset has been completed.
  * @param {LH.Gatherer.FRProtocolSession} session
- * @return {CancellableWait}
+ * @return {CancellableWait<LH.Crdp.Page.FrameNavigatedEvent>}
  */
 function waitForFrameNavigated(session) {
   /** @type {(() => void)} */
@@ -49,6 +54,7 @@ function waitForFrameNavigated(session) {
     throw new Error('waitForFrameNavigated.cancel() called before it was defined');
   };
 
+  /** @type {Promise<LH.Crdp.Page.FrameNavigatedEvent>} */
   const promise = new Promise((resolve, reject) => {
     session.once('Page.frameNavigated', resolve);
     cancel = () => {
@@ -231,7 +237,8 @@ function waitForCPUIdle(session, waitForCPUQuiet) {
   async function checkForQuiet(executionContext, resolve) {
     if (canceled) return;
     const timeSinceLongTask =
-      await executionContext.evaluate(checkTimeSinceLastLongTaskInPage, {args: []});
+      await executionContext.evaluate(
+        checkTimeSinceLastLongTaskInPage, {args: [], useIsolation: true});
     if (canceled) return;
 
     if (typeof timeSinceLongTask === 'number') {
@@ -254,7 +261,7 @@ function waitForCPUIdle(session, waitForCPUQuiet) {
   const executionContext = new ExecutionContext(session);
   /** @type {Promise<void>} */
   const promise = new Promise((resolve, reject) => {
-    executionContext.evaluate(registerPerformanceObserverInPage, {args: []})
+    executionContext.evaluate(registerPerformanceObserverInPage, {args: [], useIsolation: true})
       .then(() => checkForQuiet(executionContext, resolve))
       .catch(reject);
     cancel = () => {

@@ -12,9 +12,10 @@ import {FlowStepThumbnail} from '../src/common';
 
 let lhr: LH.Result;
 
-timers.useFakeTimers();
-
 describe('FlowStepThumbnail', () => {
+  before(() => timers.useFakeTimers());
+  after(() => timers.dispose());
+
   beforeEach(() => {
     global.console.warn = jestMock.fn();
 
@@ -22,13 +23,6 @@ describe('FlowStepThumbnail', () => {
       gatherMode: 'navigation',
       configSettings: {screenEmulation: {width: 400, height: 600}},
       audits: {
-        'full-page-screenshot': {
-          details: {
-            type: 'full-page-screenshot',
-            screenshot: {data: 'FPS', width: 400, height: 600},
-            nodes: {},
-          },
-        },
         'screenshot-thumbnails': {
           details: {
             type: 'filmstrip',
@@ -38,6 +32,10 @@ describe('FlowStepThumbnail', () => {
             ],
           },
         },
+      },
+      fullPageScreenshot: {
+        screenshot: {data: 'FPS', width: 400, height: 600},
+        nodes: {},
       },
     } as any;
   });

@@ -4,7 +4,7 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-/** @type {LH.Config.Json} */
+/** @type {LH.Config} */
 const config = {
   extends: 'lighthouse:default',
   settings: {
@@ -26,7 +26,7 @@ const config = {
 const expectations = {
   lhr: {
     requestedUrl: 'http://localhost:10200/ric-shim.html?long',
-    finalUrl: 'http://localhost:10200/ric-shim.html?long',
+    finalDisplayedUrl: 'http://localhost:10200/ric-shim.html?long',
     audits: {
       'total-blocking-time': {
         // With a 4x throttling multiplier in place each 50ms task takes 200ms, which results in 150ms blocking time

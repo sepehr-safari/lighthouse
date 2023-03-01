@@ -15,6 +15,7 @@
 				"tdur": 186,
 				"tts": 4516530
 			},
+      {"args":{"name":"CrRendererMain"},"cat":"__metadata","name":"thread_name","ph":"M","pid":93449,"tid":1295,"ts":0},
 			{
 				"pid": 93449,
 				"tid": 1295,

@@ -107,12 +107,24 @@ function loadSourceMapAndUsageFixture(name) {
 }
 
 /**
+ * @param {string} name
+ * @return {{devtoolsLog: LH.DevtoolsLog, trace: LH.Trace}}
+ */
+function loadTraceFixture(name) {
+  const dir = `${LH_ROOT}/core/test/fixtures/traces`;
+  return {
+    devtoolsLog: JSON.parse(fs.readFileSync(`${dir}/${name}.devtools.log.json`, 'utf-8')),
+    trace: JSON.parse(fs.readFileSync(`${dir}/${name}.json`, 'utf-8')),
+  };
+}
+
+/**
  * @template {unknown[]} TParams
  * @template TReturn
  * @param {(...args: TParams) => TReturn} fn
  */
 function makeParamsOptional(fn) {
-  return /** @type {(...args: RecursivePartial<TParams>) => TReturn} */ (fn);
+  return /** @type {(...args: LH.Util.RecursivePartial<TParams>) => TReturn} */ (fn);
 }
 
 /**
@@ -182,35 +194,27 @@ async function flushAllTimersAndMicrotasks(ms = 1000) {
  * shouldn't concern themselves about.
  */
 async function makeMocksForGatherRunner() {
-  await td.replaceEsm(require.resolve('../gather/driver/environment.js'), {
+  await td.replaceEsm('../gather/driver/environment.js', {
     getBenchmarkIndex: () => Promise.resolve(150),
     getBrowserVersion: async () => ({userAgent: 'Chrome', milestone: 80}),
     getEnvironmentWarnings: () => [],
   });
-  await td.replaceEsm(require.resolve('../gather/gatherers/stacks.js'), undefined, {
-    collectStacks: () => Promise.resolve([]),
-  });
-  await td.replaceEsm(require.resolve('../gather/gatherers/installability-errors.js'), undefined, {
-    getInstallabilityErrors: async () => ({errors: []}),
-  });
-  await td.replaceEsm(require.resolve('../gather/gatherers/web-app-manifest.js'), undefined, {
-    getWebAppManifest: async () => null,
-  });
-  await td.replaceEsm(require.resolve('../lib/emulation.js'), {
+  await td.replaceEsm('../lib/emulation.js', {
     emulate: jestMock.fn(),
     throttle: jestMock.fn(),
     clearThrottling: jestMock.fn(),
   });
-  await td.replaceEsm(require.resolve('../gather/driver/prepare.js'), {
+  await td.replaceEsm('../gather/driver/prepare.js', {
     prepareTargetForNavigationMode: jestMock.fn(),
     prepareTargetForIndividualNavigation: jestMock.fn().mockResolvedValue({warnings: []}),
+    enableAsyncStacks: jestMock.fn().mockReturnValue(jestMock.fn()),
   });
-  await td.replaceEsm(require.resolve('../gather/driver/storage.js'), {
+  await td.replaceEsm('../gather/driver/storage.js', {
     clearDataForOrigin: jestMock.fn(),
     cleanBrowserCaches: jestMock.fn(),
     getImportantStorageWarning: jestMock.fn(),
   });
-  await td.replaceEsm(require.resolve('../gather/driver/navigation.js'), {
+  await td.replaceEsm('../gather/driver/navigation.js', {
     gotoURL: jestMock.fn().mockResolvedValue({
       mainDocumentUrl: 'http://example.com',
       warnings: [],
@@ -269,7 +273,11 @@ function getURLArtifactFromDevtoolsLog(devtoolsLog) {
   }
   if (!requestedUrl || !mainDocumentUrl) throw new Error('No main frame navigations found');
 
-  return {initialUrl: 'about:blank', requestedUrl, mainDocumentUrl, finalUrl: mainDocumentUrl};
+  return {
+    requestedUrl,
+    mainDocumentUrl,
+    finalDisplayedUrl: mainDocumentUrl,
+  };
 }
 
 /**
@@ -282,9 +290,7 @@ function getURLArtifactFromDevtoolsLog(devtoolsLog) {
  * @return {Promise<Record<string, Mock<any, any>>>}
  */
 async function importMock(modulePath, importMeta) {
-  const dir = path.dirname(url.fileURLToPath(importMeta.url));
-  modulePath = path.resolve(dir, modulePath);
-  const mock = await import(modulePath);
+  const mock = await import(new URL(modulePath, importMeta.url).href);
   if (!Object.keys(mock).some(key => mock[key]?.mock)) {
     throw new Error(`${modulePath} was not mocked!`);
   }
@@ -335,6 +341,7 @@ export {
   createDecomposedPromise,
   flushAllTimersAndMicrotasks,
   makeMocksForGatherRunner,
+  loadTraceFixture,
   fnAny,
   mockCommands,
   createScript,

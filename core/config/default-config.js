@@ -3,12 +3,11 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
-'use strict';
 
 /* eslint-disable max-len */
 
+import * as LH from '../../types/lh.js';
 import * as constants from './constants.js';
-
 import * as i18n from '../lib/i18n/i18n.js';
 import {metricsToAudits} from './metrics-to-audits.js';
 
@@ -24,7 +23,7 @@ const UIStrings = {
   /** Title of the opportunity section of the Performance category. Within this section are audits with imperative titles that suggest actions the user can take to improve the loading performance of their web page. 'Suggestion'/'Optimization'/'Recommendation' are reasonable synonyms for 'opportunity' in this case. */
   loadOpportunitiesGroupTitle: 'Opportunities',
   /** Description of the opportunity section of the Performance category. 'Suggestions' could also be 'recommendations'. Within this section are audits with imperative titles that suggest actions the user can take to improve the loading performance of their web page. */
-  loadOpportunitiesGroupDescription: 'These suggestions can help your page load faster. They don\'t [directly affect](https://web.dev/performance-scoring/) the Performance score.',
+  loadOpportunitiesGroupDescription: 'These suggestions can help your page load faster. They don\'t [directly affect](https://developer.chrome.com/docs/lighthouse/performance/performance-scoring/) the Performance score.',
   /** Title of an opportunity sub-section of the Performance category. Within this section are audits with imperative titles that suggest actions the user can take to improve the time of the first initial render of the webpage. */
   firstPaintImprovementsGroupTitle: 'First Paint Improvements',
   /** Description of an opportunity sub-section of the Performance category. Within this section are audits with imperative titles that suggest actions the user can take to improve the time of the first initial render of the webpage. */
@@ -36,11 +35,11 @@ const UIStrings = {
   /** Title of the diagnostics section of the Performance category. Within this section are audits with non-imperative titles that provide more detail on the page's page load performance characteristics. Whereas the 'Opportunities' suggest an action along with expected time savings, diagnostics do not. Within this section, the user may read the details and deduce additional actions they could take. */
   diagnosticsGroupTitle: 'Diagnostics',
   /** Description of the diagnostics section of the Performance category. Within this section are audits with non-imperative titles that provide more detail on a web page's load performance characteristics. Within this section, the user may read the details and deduce additional actions they could take to improve performance. */
-  diagnosticsGroupDescription: 'More information about the performance of your application. These numbers don\'t [directly affect](https://web.dev/performance-scoring/) the Performance score.',
+  diagnosticsGroupDescription: 'More information about the performance of your application. These numbers don\'t [directly affect](https://developer.chrome.com/docs/lighthouse/performance/performance-scoring/) the Performance score.',
   /** Title of the Accessibility category of audits. This section contains audits focused on making web content accessible to all users. Also used as a label of a score gauge; try to limit to 20 characters. */
   a11yCategoryTitle: 'Accessibility',
   /** Description of the Accessibility category. This is displayed at the top of a list of audits focused on making web content accessible to all users. No character length limits. 'improve the accessibility of your web app' becomes link text to additional documentation. */
-  a11yCategoryDescription: 'These checks highlight opportunities to [improve the accessibility of your web app](https://web.dev/lighthouse-accessibility/). Only a subset of accessibility issues can be automatically detected so manual testing is also encouraged.',
+  a11yCategoryDescription: 'These checks highlight opportunities to [improve the accessibility of your web app](https://developer.chrome.com/docs/lighthouse/accessibility/). Only a subset of accessibility issues can be automatically detected so manual testing is also encouraged.',
   /** Description of the Accessibility manual checks category. This description is displayed above a list of accessibility audits that currently have no automated test and so must be verified manually by the user. No character length limits. 'conducting an accessibility review' becomes link text to additional documentation. */
   a11yCategoryManualDescription: 'These items address areas which an automated testing tool cannot cover. Learn more in our guide on [conducting an accessibility review](https://web.dev/how-to-review/).',
   /** Title of the best practices section of the Accessibility category. Within this section are audits with descriptive titles that highlight common accessibility best practices. */
@@ -77,17 +76,17 @@ const UIStrings = {
   a11yTablesListsVideoGroupDescription: 'These are opportunities to improve the experience of reading tabular or list data using assistive technology, like a screen reader.',
   /** Title of the Search Engine Optimization (SEO) category of audits. This is displayed at the top of a list of audits focused on topics related to optimizing a website for indexing by search engines. Also used as a label of a score gauge; try to limit to 20 characters. */
   seoCategoryTitle: 'SEO',
-  /** Description of the Search Engine Optimization (SEO) category. This is displayed at the top of a list of audits focused on optimizing a website for indexing by search engines. No character length limits. 'Learn More' becomes link text to additional documentation. */
+  /** Description of the Search Engine Optimization (SEO) category. This is displayed at the top of a list of audits focused on optimizing a website for indexing by search engines. No character length limits. The last sentence starting with 'Learn' becomes link text to additional documentation. */
   seoCategoryDescription: 'These checks ensure that your page is following basic search engine optimization advice. ' +
   'There are many additional factors Lighthouse does not score here that may affect your search ranking, ' +
-  'including performance on [Core Web Vitals](https://web.dev/learn-web-vitals/). [Learn more](https://support.google.com/webmasters/answer/35769).',
+  'including performance on [Core Web Vitals](https://web.dev/learn-core-web-vitals/). [Learn more about Google Search Essentials](https://support.google.com/webmasters/answer/35769).',
   /** Description of the Search Engine Optimization (SEO) manual checks category, the additional validators must be run by hand in order to check all SEO best practices. This is displayed at the top of a list of manually run audits focused on optimizing a website for indexing by search engines. No character length limits. */
   seoCategoryManualDescription: 'Run these additional validators on your site to check additional SEO best practices.',
   /** Title of the navigation section within the Search Engine Optimization (SEO) category. Within this section are audits with descriptive titles that highlight opportunities to make a page more usable on mobile devices. */
   seoMobileGroupTitle: 'Mobile Friendly',
   /** Description of the navigation section within the Search Engine Optimization (SEO) category. Within this section are audits with descriptive titles that highlight opportunities to make a page more usable on mobile devices. */
   seoMobileGroupDescription: 'Make sure your pages are mobile friendly so users don’t have to pinch or zoom ' +
-  'in order to read the content pages. [Learn more](https://developers.google.com/search/mobile-sites/).',
+  'in order to read the content pages. [Learn how to make pages mobile-friendly](https://developers.google.com/search/mobile-sites/).',
   /** Title of the navigation section within the Search Engine Optimization (SEO) category. Within this section are audits with descriptive titles that highlight ways to make a website content more easily understood by search engine crawler bots. */
   seoContentGroupTitle: 'Content Best Practices',
   /** Description of the navigation section within the Search Engine Optimization (SEO) category. Within this section are audits with descriptive titles that highlight ways to make a website content more easily understood by search engine crawler bots. */
@@ -98,9 +97,9 @@ const UIStrings = {
   seoCrawlingGroupDescription: 'To appear in search results, crawlers need access to your app.',
   /** Title of the Progressive Web Application (PWA) category of audits. This is displayed at the top of a list of audits focused on topics related to whether or not a site is a progressive web app, e.g. responds offline, uses a service worker, is on https, etc. Also used as a label of a score gauge. */
   pwaCategoryTitle: 'PWA',
-  /** Description of the Progressive Web Application (PWA) category. This is displayed at the top of a list of audits focused on topics related to whether or not a site is a progressive web app, e.g. responds offline, uses a service worker, is on https, etc. No character length limits. 'Learn More' becomes link text to additional documentation. */
+  /** Description of the Progressive Web Application (PWA) category. This is displayed at the top of a list of audits focused on topics related to whether or not a site is a progressive web app, e.g. responds offline, uses a service worker, is on https, etc. No character length limits. The last sentence starting with 'Learn' becomes link text to additional documentation. */
   pwaCategoryDescription: 'These checks validate the aspects of a Progressive Web App. ' +
-  '[Learn more](https://web.dev/pwa-checklist/).',
+  '[Learn what makes a good Progressive Web App](https://web.dev/pwa-checklist/).',
   /** Description of the Progressive Web Application (PWA) manual checks category, containing a list of additional validators must be run by hand in order to check all PWA best practices. This is displayed at the top of a list of manually run audits focused on topics related to whether or not a site is a progressive web app, e.g. responds offline, uses a service worker, is on https, etc.. No character length limits. */
   pwaCategoryManualDescription: 'These checks are required by the baseline ' +
   '[PWA Checklist](https://web.dev/pwa-checklist/) but are ' +
@@ -123,159 +122,57 @@ const UIStrings = {
 
 const str_ = i18n.createIcuMessageFn(import.meta.url, UIStrings);
 
-// Ensure all artifact IDs match the typedefs.
-/** @type {Record<keyof LH.FRArtifacts, string>} */
-const artifacts = {
-  DevtoolsLog: '',
-  Trace: '',
-  Accessibility: '',
-  AnchorElements: '',
-  CacheContents: '',
-  ConsoleMessages: '',
-  CSSUsage: '',
-  Doctype: '',
-  DOMStats: '',
-  EmbeddedContent: '',
-  FontSize: '',
-  Inputs: '',
-  FullPageScreenshot: '',
-  GlobalListeners: '',
-  IFrameElements: '',
-  ImageElements: '',
-  InstallabilityErrors: '',
-  InspectorIssues: '',
-  JsUsage: '',
-  LinkElements: '',
-  MainDocumentContent: '',
-  MetaElements: '',
-  NetworkUserAgent: '',
-  OptimizedImages: '',
-  PasswordInputsWithPreventedPaste: '',
-  ResponseCompression: '',
-  RobotsTxt: '',
-  ServiceWorker: '',
-  ScriptElements: '',
-  Scripts: '',
-  SourceMaps: '',
-  Stacks: '',
-  TagsBlockingFirstPaint: '',
-  TapTargets: '',
-  TraceElements: '',
-  ViewportDimensions: '',
-  WebAppManifest: '',
-  devtoolsLogs: '',
-  traces: '',
-};
-
-for (const key of Object.keys(artifacts)) {
-  artifacts[/** @type {keyof typeof artifacts} */ (key)] = key;
-}
-
-/** @type {LH.Config.Json} */
+/** @type {LH.Config} */
 const defaultConfig = {
   settings: constants.defaultSettings,
   artifacts: [
     // Artifacts which can be depended on come first.
-    {id: artifacts.DevtoolsLog, gatherer: 'devtools-log'},
-    {id: artifacts.Trace, gatherer: 'trace'},
+    {id: 'DevtoolsLog', gatherer: 'devtools-log'},
+    {id: 'Trace', gatherer: 'trace'},
 
-    {id: artifacts.Accessibility, gatherer: 'accessibility'},
-    {id: artifacts.AnchorElements, gatherer: 'anchor-elements'},
-    {id: artifacts.CacheContents, gatherer: 'cache-contents'},
-    {id: artifacts.ConsoleMessages, gatherer: 'console-messages'},
-    {id: artifacts.CSSUsage, gatherer: 'css-usage'},
-    {id: artifacts.Doctype, gatherer: 'dobetterweb/doctype'},
-    {id: artifacts.DOMStats, gatherer: 'dobetterweb/domstats'},
-    {id: artifacts.EmbeddedContent, gatherer: 'seo/embedded-content'},
-    {id: artifacts.FontSize, gatherer: 'seo/font-size'},
-    {id: artifacts.Inputs, gatherer: 'inputs'},
-    {id: artifacts.GlobalListeners, gatherer: 'global-listeners'},
-    {id: artifacts.IFrameElements, gatherer: 'iframe-elements'},
-    {id: artifacts.ImageElements, gatherer: 'image-elements'},
-    {id: artifacts.InstallabilityErrors, gatherer: 'installability-errors'},
-    {id: artifacts.InspectorIssues, gatherer: 'inspector-issues'},
-    {id: artifacts.JsUsage, gatherer: 'js-usage'},
-    {id: artifacts.LinkElements, gatherer: 'link-elements'},
-    {id: artifacts.MainDocumentContent, gatherer: 'main-document-content'},
-    {id: artifacts.MetaElements, gatherer: 'meta-elements'},
-    {id: artifacts.NetworkUserAgent, gatherer: 'network-user-agent'},
-    {id: artifacts.OptimizedImages, gatherer: 'dobetterweb/optimized-images'},
-    {id: artifacts.PasswordInputsWithPreventedPaste, gatherer: 'dobetterweb/password-inputs-with-prevented-paste'},
-    {id: artifacts.ResponseCompression, gatherer: 'dobetterweb/response-compression'},
-    {id: artifacts.RobotsTxt, gatherer: 'seo/robots-txt'},
-    {id: artifacts.ServiceWorker, gatherer: 'service-worker'},
-    {id: artifacts.ScriptElements, gatherer: 'script-elements'},
-    {id: artifacts.Scripts, gatherer: 'scripts'},
-    {id: artifacts.SourceMaps, gatherer: 'source-maps'},
-    {id: artifacts.Stacks, gatherer: 'stacks'},
-    {id: artifacts.TagsBlockingFirstPaint, gatherer: 'dobetterweb/tags-blocking-first-paint'},
-    {id: artifacts.TapTargets, gatherer: 'seo/tap-targets'},
-    {id: artifacts.TraceElements, gatherer: 'trace-elements'},
-    {id: artifacts.ViewportDimensions, gatherer: 'viewport-dimensions'},
-    {id: artifacts.WebAppManifest, gatherer: 'web-app-manifest'},
+    {id: 'Accessibility', gatherer: 'accessibility'},
+    {id: 'AnchorElements', gatherer: 'anchor-elements'},
+    {id: 'CacheContents', gatherer: 'cache-contents'},
+    {id: 'ConsoleMessages', gatherer: 'console-messages'},
+    {id: 'CSSUsage', gatherer: 'css-usage'},
+    {id: 'Doctype', gatherer: 'dobetterweb/doctype'},
+    {id: 'DOMStats', gatherer: 'dobetterweb/domstats'},
+    {id: 'EmbeddedContent', gatherer: 'seo/embedded-content'},
+    {id: 'FontSize', gatherer: 'seo/font-size'},
+    {id: 'Inputs', gatherer: 'inputs'},
+    {id: 'GlobalListeners', gatherer: 'global-listeners'},
+    {id: 'IFrameElements', gatherer: 'iframe-elements'},
+    {id: 'ImageElements', gatherer: 'image-elements'},
+    {id: 'InstallabilityErrors', gatherer: 'installability-errors'},
+    {id: 'InspectorIssues', gatherer: 'inspector-issues'},
+    {id: 'JsUsage', gatherer: 'js-usage'},
+    {id: 'LinkElements', gatherer: 'link-elements'},
+    {id: 'MainDocumentContent', gatherer: 'main-document-content'},
+    {id: 'MetaElements', gatherer: 'meta-elements'},
+    {id: 'NetworkUserAgent', gatherer: 'network-user-agent'},
+    {id: 'OptimizedImages', gatherer: 'dobetterweb/optimized-images'},
+    {id: 'ResponseCompression', gatherer: 'dobetterweb/response-compression'},
+    {id: 'RobotsTxt', gatherer: 'seo/robots-txt'},
+    {id: 'ServiceWorker', gatherer: 'service-worker'},
+    {id: 'ScriptElements', gatherer: 'script-elements'},
+    {id: 'Scripts', gatherer: 'scripts'},
+    {id: 'SourceMaps', gatherer: 'source-maps'},
+    {id: 'Stacks', gatherer: 'stacks'},
+    {id: 'TagsBlockingFirstPaint', gatherer: 'dobetterweb/tags-blocking-first-paint'},
+    {id: 'TapTargets', gatherer: 'seo/tap-targets'},
+    {id: 'TraceElements', gatherer: 'trace-elements'},
+    {id: 'ViewportDimensions', gatherer: 'viewport-dimensions'},
+    {id: 'WebAppManifest', gatherer: 'web-app-manifest'},
 
     // Artifact copies are renamed for compatibility with legacy artifacts.
-    {id: artifacts.devtoolsLogs, gatherer: 'devtools-log-compat'},
-    {id: artifacts.traces, gatherer: 'trace-compat'},
+    {id: 'devtoolsLogs', gatherer: 'devtools-log-compat'},
+    {id: 'traces', gatherer: 'trace-compat'},
 
-    // FullPageScreenshot comes at the very end so all other node analysis is captured.
-    {id: artifacts.FullPageScreenshot, gatherer: 'full-page-screenshot'},
-  ],
-  navigations: [
-    {
-      id: 'default',
-      pauseAfterFcpMs: 1000,
-      pauseAfterLoadMs: 1000,
-      networkQuietThresholdMs: 1000,
-      cpuQuietThresholdMs: 1000,
-      artifacts: [
-        // Artifacts which can be depended on come first.
-        artifacts.DevtoolsLog,
-        artifacts.Trace,
+    // FullPageScreenshot comes at the end so all other node analysis is captured.
+    {id: 'FullPageScreenshot', gatherer: 'full-page-screenshot'},
 
-        artifacts.Accessibility,
-        artifacts.AnchorElements,
-        artifacts.CacheContents,
-        artifacts.ConsoleMessages,
-        artifacts.CSSUsage,
-        artifacts.Doctype,
-        artifacts.DOMStats,
-        artifacts.EmbeddedContent,
-        artifacts.FontSize,
-        artifacts.Inputs,
-        artifacts.GlobalListeners,
-        artifacts.IFrameElements,
-        artifacts.ImageElements,
-        artifacts.InstallabilityErrors,
-        artifacts.InspectorIssues,
-        artifacts.JsUsage,
-        artifacts.LinkElements,
-        artifacts.MainDocumentContent,
-        artifacts.MetaElements,
-        artifacts.NetworkUserAgent,
-        artifacts.OptimizedImages,
-        artifacts.PasswordInputsWithPreventedPaste,
-        artifacts.ResponseCompression,
-        artifacts.RobotsTxt,
-        artifacts.ServiceWorker,
-        artifacts.ScriptElements,
-        artifacts.Scripts,
-        artifacts.SourceMaps,
-        artifacts.Stacks,
-        artifacts.TagsBlockingFirstPaint,
-        artifacts.TapTargets,
-        artifacts.TraceElements,
-        artifacts.ViewportDimensions,
-        artifacts.WebAppManifest,
-
-        // Compat artifacts come last.
-        artifacts.devtoolsLogs,
-        artifacts.traces,
-
-        // FullPageScreenshot comes at the very end so all other node analysis is captured.
-        artifacts.FullPageScreenshot,
-      ],
-    },
+    // BFCacheFailures comes at the very end because it can perform a page navigation.
+    {id: 'BFCacheFailures', gatherer: 'bf-cache-failures'},
   ],
   audits: [
     'is-on-https',
@@ -330,9 +227,8 @@ const defaultConfig = {
     'non-composited-animations',
     'unsized-images',
     'valid-source-maps',
-    'preload-lcp-image',
+    'prioritize-lcp-image',
     'csp-xss',
-    'full-page-screenshot',
     'script-treemap-data',
     'manual/pwa-cross-browser',
     'manual/pwa-page-transitions',
@@ -413,10 +309,9 @@ const defaultConfig = {
     'dobetterweb/geolocation-on-start',
     'dobetterweb/inspector-issues',
     'dobetterweb/no-document-write',
-    'dobetterweb/no-vulnerable-libraries',
     'dobetterweb/js-libraries',
     'dobetterweb/notification-on-start',
-    'dobetterweb/password-inputs-can-be-pasted-into',
+    'dobetterweb/paste-preventing-inputs',
     'dobetterweb/uses-http2',
     'dobetterweb/uses-passive-event-listeners',
     'seo/meta-description',
@@ -432,6 +327,7 @@ const defaultConfig = {
     'seo/canonical',
     'seo/manual/structured-data',
     'work-during-interaction',
+    'bf-cache',
   ],
   groups: {
     'metrics': {
@@ -520,14 +416,14 @@ const defaultConfig = {
       supportedModes: ['navigation', 'timespan', 'snapshot'],
       auditRefs: [
         {id: 'first-contentful-paint', weight: 10, group: 'metrics', acronym: 'FCP', relevantAudits: metricsToAudits.fcpRelevantAudits},
-        {id: 'interactive', weight: 10, group: 'metrics', acronym: 'TTI'},
-        {id: 'speed-index', weight: 10, group: 'metrics', acronym: 'SI'},
-        {id: 'total-blocking-time', weight: 30, group: 'metrics', acronym: 'TBT', relevantAudits: metricsToAudits.tbtRelevantAudits},
         {id: 'largest-contentful-paint', weight: 25, group: 'metrics', acronym: 'LCP', relevantAudits: metricsToAudits.lcpRelevantAudits},
-        {id: 'cumulative-layout-shift', weight: 15, group: 'metrics', acronym: 'CLS', relevantAudits: metricsToAudits.clsRelevantAudits},
+        {id: 'total-blocking-time', weight: 30, group: 'metrics', acronym: 'TBT', relevantAudits: metricsToAudits.tbtRelevantAudits},
+        {id: 'cumulative-layout-shift', weight: 25, group: 'metrics', acronym: 'CLS', relevantAudits: metricsToAudits.clsRelevantAudits},
+        {id: 'speed-index', weight: 10, group: 'metrics', acronym: 'SI'},
         {id: 'experimental-interaction-to-next-paint', weight: 0, group: 'metrics', acronym: 'INP', relevantAudits: metricsToAudits.inpRelevantAudits},
 
         // These are our "invisible" metrics. Not displayed, but still in the LHR.
+        {id: 'interactive', weight: 0, group: 'hidden', acronym: 'TTI'},
         {id: 'max-potential-fid', weight: 0, group: 'hidden'},
         {id: 'first-meaningful-paint', weight: 0, acronym: 'FMP', group: 'hidden'},
 
@@ -550,7 +446,7 @@ const defaultConfig = {
         {id: 'efficient-animated-content', weight: 0},
         {id: 'duplicated-javascript', weight: 0},
         {id: 'legacy-javascript', weight: 0},
-        {id: 'preload-lcp-image', weight: 0},
+        {id: 'prioritize-lcp-image', weight: 0},
         {id: 'total-byte-weight', weight: 0},
         {id: 'uses-long-cache-ttl', weight: 0},
         {id: 'dom-size', weight: 0},
@@ -571,9 +467,9 @@ const defaultConfig = {
         {id: 'non-composited-animations', weight: 0},
         {id: 'unsized-images', weight: 0},
         {id: 'viewport', weight: 0},
-        {id: 'no-unload-listeners', weight: 0},
         {id: 'uses-responsive-images-snapshot', weight: 0},
         {id: 'work-during-interaction', weight: 0},
+        {id: 'bf-cache', weight: 0},
 
         // Budget audits.
         {id: 'performance-budget', weight: 0, group: 'budgets'},
@@ -666,10 +562,9 @@ const defaultConfig = {
         {id: 'is-on-https', weight: 1, group: 'best-practices-trust-safety'},
         {id: 'geolocation-on-start', weight: 1, group: 'best-practices-trust-safety'},
         {id: 'notification-on-start', weight: 1, group: 'best-practices-trust-safety'},
-        {id: 'no-vulnerable-libraries', weight: 1, group: 'best-practices-trust-safety'},
         {id: 'csp-xss', weight: 0, group: 'best-practices-trust-safety'},
         // User Experience
-        {id: 'password-inputs-can-be-pasted-into', weight: 1, group: 'best-practices-ux'},
+        {id: 'paste-preventing-inputs', weight: 1, group: 'best-practices-ux'},
         {id: 'image-aspect-ratio', weight: 1, group: 'best-practices-ux'},
         {id: 'image-size-responsive', weight: 1, group: 'best-practices-ux'},
         {id: 'preload-fonts', weight: 1, group: 'best-practices-ux'},
@@ -677,6 +572,7 @@ const defaultConfig = {
         {id: 'doctype', weight: 1, group: 'best-practices-browser-compat'},
         {id: 'charset', weight: 1, group: 'best-practices-browser-compat'},
         // General Group
+        {id: 'no-unload-listeners', weight: 1, group: 'best-practices-general'},
         {id: 'js-libraries', weight: 0, group: 'best-practices-general'},
         {id: 'deprecations', weight: 1, group: 'best-practices-general'},
         {id: 'errors-in-console', weight: 1, group: 'best-practices-general'},
@@ -732,10 +628,10 @@ const defaultConfig = {
   },
 };
 
-export default defaultConfig;
-
 // Use `defineProperty` so that the strings are accesible from original but ignored when we copy it
 Object.defineProperty(defaultConfig, 'UIStrings', {
   enumerable: false,
   get: () => UIStrings,
 });
+
+export default defaultConfig;

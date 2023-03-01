@@ -4,36 +4,33 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-'use strict';
-
 import {Audit} from './audit.js';
 import {ByteEfficiencyAudit} from './byte-efficiency/byte-efficiency-audit.js';
-import URL from '../lib/url-shim.js';
+import UrlUtils from '../lib/url-utils.js';
 import * as i18n from '../lib/i18n/i18n.js';
-import NetworkRecords from '../computed/network-records.js';
-import MainResource from '../computed/main-resource.js';
-import LoadSimulator from '../computed/load-simulator.js';
-import ProcessedTrace from '../computed/processed-trace.js';
-import ProcessedNavigation from '../computed/processed-navigation.js';
-import PageDependencyGraph from '../computed/page-dependency-graph.js';
-import LanternLCP from '../computed/metrics/lantern-largest-contentful-paint.js';
+import {NetworkRecords} from '../computed/network-records.js';
+import {MainResource} from '../computed/main-resource.js';
+import {LoadSimulator} from '../computed/load-simulator.js';
+import {ProcessedNavigation} from '../computed/processed-navigation.js';
+import {PageDependencyGraph} from '../computed/page-dependency-graph.js';
+import {LanternLargestContentfulPaint} from '../computed/metrics/lantern-largest-contentful-paint.js';
 
 // Preconnect establishes a "clean" socket. Chrome's socket manager will keep an unused socket
 // around for 10s. Meaning, the time delta between processing preconnect a request should be <10s,
 // otherwise it's wasted. We add a 5s margin so we are sure to capture all key requests.
 // @see https://github.com/GoogleChrome/lighthouse/issues/3106#issuecomment-333653747
-const PRECONNECT_SOCKET_MAX_IDLE = 15;
+const PRECONNECT_SOCKET_MAX_IDLE_IN_MS = 15_000;
 
 const IGNORE_THRESHOLD_IN_MS = 50;
 
 const UIStrings = {
   /** Imperative title of a Lighthouse audit that tells the user to connect early to internet domains that will be used to load page resources. Origin is the correct term, however 'domain name' could be used if neccsesary. This is displayed in a list of audit titles that Lighthouse generates. */
   title: 'Preconnect to required origins',
-  /** Description of a Lighthouse audit that tells the user how to connect early to third-party domains that will be used to load page resources. This is displayed after a user expands the section to see more. No character length limits. 'Learn More' becomes link text to additional documentation. */
+  /** Description of a Lighthouse audit that tells the user how to connect early to third-party domains that will be used to load page resources. This is displayed after a user expands the section to see more. No character length limits. The last sentence starting with 'Learn' becomes link text to additional documentation. */
   description:
     'Consider adding `preconnect` or `dns-prefetch` resource hints to establish early ' +
     'connections to important third-party origins. ' +
-    '[Learn how to preconnect to required origins](https://web.dev/uses-rel-preconnect/).',
+    '[Learn how to preconnect to required origins](https://developer.chrome.com/docs/lighthouse/performance/uses-rel-preconnect/).',
   /**
    * @description A warning message that is shown when the user tried to follow the advice of the audit, but it's not working as expected.
    * @example {https://example.com} securityOrigin
@@ -98,7 +95,8 @@ class UsesRelPreconnectAudit extends Audit {
    * @return {boolean}
    */
   static socketStartTimeIsBelowThreshold(record, mainResource) {
-    return Math.max(0, record.startTime - mainResource.endTime) < PRECONNECT_SOCKET_MAX_IDLE;
+    const timeSinceMainEnd = Math.max(0, record.networkRequestTime - mainResource.networkEndTime);
+    return timeSinceMainEnd < PRECONNECT_SOCKET_MAX_IDLE_IN_MS;
   }
 
   /**
@@ -115,19 +113,18 @@ class UsesRelPreconnectAudit extends Audit {
     /** @type {Array<LH.IcuMessage>} */
     const warnings = [];
 
-    const processedTrace = await ProcessedTrace.request(trace, context);
-
     const [networkRecords, mainResource, loadSimulator, processedNavigation, pageGraph] =
       await Promise.all([
         NetworkRecords.request(devtoolsLog, context),
         MainResource.request({devtoolsLog, URL: artifacts.URL}, context),
         LoadSimulator.request({devtoolsLog, settings}, context),
-        ProcessedNavigation.request(processedTrace, context),
+        ProcessedNavigation.request(trace, context),
         PageDependencyGraph.request({trace, devtoolsLog, URL: artifacts.URL}, context),
       ]);
 
     const {rtt, additionalRttByOrigin} = loadSimulator.getOptions();
-    const lcpGraph = await LanternLCP.getPessimisticGraph(pageGraph, processedNavigation);
+    const lcpGraph =
+      await LanternLargestContentfulPaint.getPessimisticGraph(pageGraph, processedNavigation);
     /** @type {Set<string>} */
     const lcpGraphURLs = new Set();
     lcpGraph.traverse(node => {
@@ -151,7 +148,7 @@ class UsesRelPreconnectAudit extends Audit {
           !lcpGraphURLs.has(record.url) ||
           // Filter out all resources where origins are already resolved.
           UsesRelPreconnectAudit.hasAlreadyConnectedToOrigin(record) ||
-          // Make sure the requests are below the PRECONNECT_SOCKET_MAX_IDLE (15s) mark.
+          // Make sure the requests are below the PRECONNECT_SOCKET_MAX_IDLE_IN_MS (15s) mark.
           !UsesRelPreconnectAudit.socketStartTimeIsBelowThreshold(record, mainResource)
         ) {
           return;
@@ -164,7 +161,8 @@ class UsesRelPreconnectAudit extends Audit {
       });
 
     const preconnectLinks = artifacts.LinkElements.filter(el => el.rel === 'preconnect');
-    const preconnectOrigins = new Set(preconnectLinks.map(link => URL.getOrigin(link.href || '')));
+    const preconnectOrigins =
+      new Set(preconnectLinks.map(link => UrlUtils.getOrigin(link.href || '')));
 
     /** @type {Array<{url: string, wastedMs: number}>}*/
     let results = [];
@@ -172,7 +170,7 @@ class UsesRelPreconnectAudit extends Audit {
       // Sometimes requests are done simultaneous and the connection has not been made
       // chrome will try to connect for each network record, we get the first record
       const firstRecordOfOrigin = records.reduce((firstRecord, record) => {
-        return (record.startTime < firstRecord.startTime) ? record : firstRecord;
+        return (record.networkRequestTime < firstRecord.networkRequestTime) ? record : firstRecord;
       });
 
       // Skip the origin if we don't have timing information
@@ -189,8 +187,8 @@ class UsesRelPreconnectAudit extends Audit {
       if (firstRecordOfOrigin.parsedURL.scheme === 'https') connectionTime = connectionTime * 2;
 
       const timeBetweenMainResourceAndDnsStart =
-        firstRecordOfOrigin.startTime * 1000 -
-        mainResource.endTime * 1000 +
+        firstRecordOfOrigin.networkRequestTime -
+        mainResource.networkEndTime +
         firstRecordOfOrigin.timing.dnsStart;
 
       const wastedMs = Math.min(connectionTime, timeBetweenMainResourceAndDnsStart);
@@ -235,7 +233,8 @@ class UsesRelPreconnectAudit extends Audit {
       {key: 'wastedMs', valueType: 'timespanMs', label: str_(i18n.UIStrings.columnWastedMs)},
     ];
 
-    const details = Audit.makeOpportunityDetails(headings, results, maxWasted);
+    const details = Audit.makeOpportunityDetails(headings, results,
+      {overallSavingsMs: maxWasted});
 
     return {
       score: ByteEfficiencyAudit.scoreForWastedMs(maxWasted),

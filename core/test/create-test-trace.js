@@ -7,8 +7,10 @@
 const pid = 1111;
 const tid = 222;
 const browserPid = 13725;
-const rootFrame = '3EFC2700D7BC3F4734CAF2F726EFB78C';
+const rootFrame = 'ROOT_FRAME';
 const defaultUrl = 'https://example.com/';
+const lcpNodeId = 16;
+const lcpImageUrl = 'http://www.example.com/image.png';
 
 /** @typedef {{ts: number, duration: number, children?: Array<ChildTaskDef>}} TopLevelTaskDef */
 /** @typedef {{ts: number, duration: number, url: string | undefined}} ChildTaskDef */
@@ -175,7 +177,32 @@ function createTestTrace(options) {
       tid,
       ph: 'R',
       cat: 'loading,rail,devtools.timeline',
-      args: {frame: rootFrame, isMainFrame: true, data: {size: 50}},
+      args: {
+        frame: rootFrame,
+        data: {
+          isMainFrame: true,
+          nodeId: lcpNodeId,
+          size: 50,
+          type: 'image',
+        },
+      },
+    });
+
+    traceEvents.push({
+      name: 'LargestImagePaint::Candidate',
+      ts: options.largestContentfulPaint * 1000,
+      pid,
+      tid,
+      ph: 'R',
+      cat: 'loading',
+      args: {
+        frame: rootFrame,
+        data: {
+          DOMNodeId: lcpNodeId,
+          size: 50,
+          imageUrl: lcpImageUrl,
+        },
+      },
     });
   }
 
@@ -198,4 +225,7 @@ function createTestTrace(options) {
   return {traceEvents};
 }
 
-export {createTestTrace};
+export {
+  createTestTrace,
+  rootFrame,
+};

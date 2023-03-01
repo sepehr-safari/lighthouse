@@ -4,7 +4,7 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-import {strict as assert} from 'assert';
+import assert from 'assert/strict';
 
 import {MainThreadTasks} from '../../../lib/tracehouse/main-thread-tasks.js';
 import {TraceProcessor} from '../../../lib/tracehouse/trace-processor.js';
@@ -26,6 +26,8 @@ describe('Main Thread Tasks', () => {
     boilerplateTrace = [
       {ph: 'I', name: 'TracingStartedInPage', pid, tid, ts: baseTs, args: {data: {page: frameId}}},
       {ph: 'I', name: 'navigationStart', pid, tid, ts: baseTs, args},
+      {ph: 'M', name: 'thread_name', pid, tid, ts: baseTs, cat: '__metadata', args:
+        {name: 'CrRendererMain'}},
       {ph: 'R', name: 'firstContentfulPaint', pid, tid, ts: baseTs + 1, args},
     ];
   });
@@ -115,7 +117,10 @@ describe('Main Thread Tasks', () => {
       {ph: 'E', name: 'TaskB', pid, tid, ts: baseTs + 55e3, args},
     ];
 
-    traceEvents.forEach(evt => Object.assign(evt, {cat: 'devtools.timeline'}));
+    traceEvents.filter(evt => !evt.cat).forEach(evt => {
+      evt.cat = 'devtools.timeline';
+      evt.args = evt.args || args;
+    });
 
     const tasks = run({traceEvents});
     expect(tasks).toHaveLength(3);
@@ -128,7 +133,7 @@ describe('Main Thread Tasks', () => {
       attributableURLs: [],
 
       children: [taskB],
-      event: traceEvents[3],
+      event: traceEvents[4],
       startTime: 0,
       endTime: 100,
       duration: 100,
@@ -142,8 +147,8 @@ describe('Main Thread Tasks', () => {
       attributableURLs: [],
 
       children: [taskC],
-      event: traceEvents[4],
-      endEvent: traceEvents[6],
+      event: traceEvents[5],
+      endEvent: traceEvents[7],
       startTime: 5,
       endTime: 55,
       duration: 50,
@@ -174,7 +179,7 @@ describe('Main Thread Tasks', () => {
       {ph: 'E', name: 'TaskB', pid, tid, ts: baseTs + 55e3},
     ];
 
-    traceEvents.forEach(evt => {
+    traceEvents.filter(evt => !evt.cat).forEach(evt => {
       evt.cat = 'devtools.timeline';
       evt.args = evt.args || args;
     });
@@ -215,7 +220,7 @@ describe('Main Thread Tasks', () => {
       {ph: 'X', name: 'TaskE', pid, tid, ts: baseTs + 80e3, dur: 5e3, ...stackTrace(['urlD'])},
     ];
 
-    traceEvents.forEach(evt => {
+    traceEvents.filter(evt => !evt.cat).forEach(evt => {
       evt.cat = 'devtools.timeline';
       evt.args = evt.args || args;
     });
@@ -256,23 +261,24 @@ describe('Main Thread Tasks', () => {
     */
     const traceEvents = [
       ...boilerplateTrace,
-      {ph: 'X', name: 'TaskA', ts: baseTs, dur: 70e3, ...url('about:blank')},
-      {ph: 'X', name: 'EvaluateScript', ts: baseTs + 10e3, dur: 30e3, ...url('urlA')},
-      {ph: 'X', name: 'XHRReadyStateChange', ts: baseTs + 15e3, dur: 15e3, ...xhr('urlXHR', 1)},
-      {ph: 'X', name: 'TaskB', ts: baseTs + 80e3, dur: 20e3},
+      {ph: 'X', name: 'TaskA', ts: baseTs, pid, tid, dur: 70e3, ...url('about:blank')},
+      {ph: 'X', name: 'EvaluateScript', ts: baseTs + 10e3, pid, tid, dur: 30e3, ...url('urlA')},
+      {ph: 'X', name: 'XHRReadyStateChange', ts: baseTs + 15e3, pid, tid, dur: 15e3,
+        ...xhr('urlXHR', 1)},
+      {ph: 'X', name: 'TaskB', ts: baseTs + 80e3, pid, tid, dur: 20e3},
       {
         ph: 'X',
         name: 'XHRReadyStateChange',
         ts: baseTs + 85e3,
+        pid,
+        tid,
         dur: 15e3,
         ...xhr('urlXHR', 4, ['urlC']),
       }, // eslint-disable-line max-len
-      {ph: 'X', name: 'TaskC', ts: baseTs + 89e3, dur: 4e3},
+      {ph: 'X', name: 'TaskC', ts: baseTs + 89e3, pid, tid, dur: 4e3},
     ];
 
-    traceEvents.forEach(evt => {
-      evt.pid = pid;
-      evt.tid = tid;
+    traceEvents.filter(evt => !evt.cat).forEach(evt => {
       evt.cat = 'devtools.timeline';
       evt.args = evt.args || args;
     });
@@ -318,7 +324,7 @@ describe('Main Thread Tasks', () => {
       {ph: 'X', name: 'Layout', pid, tid, ts: baseTs + 90e3, dur: 4e3, ...frame('B')},
     ];
 
-    traceEvents.forEach(evt => {
+    traceEvents.filter(evt => !evt.cat).forEach(evt => {
       evt.cat = 'devtools.timeline';
       evt.args = evt.args || args;
     });
@@ -353,7 +359,7 @@ describe('Main Thread Tasks', () => {
       {ph: 'X', name: 'Layout', pid, tid, ts: baseTs + 100e3, dur: 10e3},
     ];
 
-    traceEvents.forEach(evt => {
+    traceEvents.filter(evt => !evt.cat).forEach(evt => {
       evt.cat = 'devtools.timeline';
       evt.args = evt.args || args;
     });
@@ -389,7 +395,10 @@ describe('Main Thread Tasks', () => {
       {ph: 'I', name: 'MarkerToPushOutTraceEnd', pid, tid, ts: baseTs + 110e3, args},
     ];
 
-    traceEvents.forEach(evt => Object.assign(evt, {cat: 'devtools.timeline'}));
+    traceEvents.filter(evt => !evt.cat).forEach(evt => {
+      evt.cat = 'devtools.timeline';
+      evt.args = evt.args || args;
+    });
 
     const tasks = run({traceEvents});
     expect(tasks).toHaveLength(3);
@@ -402,7 +411,7 @@ describe('Main Thread Tasks', () => {
       attributableURLs: [],
 
       children: [taskB],
-      event: traceEvents[3],
+      event: traceEvents[4],
       startTime: 0,
       endTime: 110,
       duration: 110,
@@ -416,7 +425,7 @@ describe('Main Thread Tasks', () => {
       attributableURLs: [],
 
       children: [taskC],
-      event: traceEvents[4],
+      event: traceEvents[5],
       startTime: 5,
       endTime: 110,
       duration: 105,
@@ -445,7 +454,10 @@ describe('Main Thread Tasks', () => {
       {ph: 'X', name: 'TaskD', pid, tid, ts: baseTs + 100e3, dur: 100e3, args},
     ];
 
-    traceEvents.forEach(evt => Object.assign(evt, {cat: 'devtools.timeline'}));
+    traceEvents.filter(evt => !evt.cat).forEach(evt => {
+      evt.cat = 'devtools.timeline';
+      evt.args = evt.args || args;
+    });
 
     const tasks = run({traceEvents});
     expect(tasks).toMatchObject([
@@ -474,7 +486,10 @@ describe('Main Thread Tasks', () => {
       {ph: 'E', name: 'TaskC', pid, tid, ts: baseTs + 100e3, args},
     ];
 
-    traceEvents.forEach(evt => Object.assign(evt, {cat: 'devtools.timeline'}));
+    traceEvents.filter(evt => !evt.cat).forEach(evt => {
+      evt.cat = 'devtools.timeline';
+      evt.args = evt.args || args;
+    });
 
     const tasks = run({traceEvents});
     expect(tasks).toMatchObject([
@@ -501,7 +516,10 @@ describe('Main Thread Tasks', () => {
       {ph: 'E', name: 'TaskANested', pid, tid, ts: baseTs + 100e3, args},
     ];
 
-    traceEvents.forEach(evt => Object.assign(evt, {cat: 'devtools.timeline'}));
+    traceEvents.filter(evt => !evt.cat).forEach(evt => {
+      evt.cat = 'devtools.timeline';
+      evt.args = evt.args || args;
+    });
 
     const tasks = run({traceEvents});
     expect(tasks).toMatchObject([
@@ -524,7 +542,10 @@ describe('Main Thread Tasks', () => {
       {ph: 'E', name: 'TaskB', pid, tid, ts: baseTs + 50e3, args},
     ];
 
-    traceEvents.forEach(evt => Object.assign(evt, {cat: 'devtools.timeline'}));
+    traceEvents.filter(evt => !evt.cat).forEach(evt => {
+      evt.cat = 'devtools.timeline';
+      evt.args = evt.args || args;
+    });
 
     const tasks = run({traceEvents});
     const [taskA, taskB] = tasks;
@@ -572,7 +593,10 @@ describe('Main Thread Tasks', () => {
       {ph: 'B', name: 'TaskB', pid, tid, ts: baseTs + 100e3, args},
     ];
 
-    traceEvents.forEach(evt => Object.assign(evt, {cat: 'devtools.timeline'}));
+    traceEvents.filter(evt => !evt.cat).forEach(evt => {
+      evt.cat = 'devtools.timeline';
+      evt.args = evt.args || args;
+    });
 
     const tasks = run({traceEvents});
     expect(tasks).toEqual([
@@ -621,7 +645,10 @@ describe('Main Thread Tasks', () => {
       {ph: 'E', name: 'SameName', pid, tid, ts: baseTs + 100e3, args},
     ];
 
-    traceEvents.forEach(evt => Object.assign(evt, {cat: 'devtools.timeline'}));
+    traceEvents.filter(evt => !evt.cat).forEach(evt => {
+      evt.cat = 'devtools.timeline';
+      evt.args = evt.args || args;
+    });
 
     const tasks = run({traceEvents});
     expect(tasks).toEqual([
@@ -670,7 +697,10 @@ describe('Main Thread Tasks', () => {
       {ph: 'E', name: 'TaskB', pid, tid, ts: baseTs + 100e3, args},
     ];
 
-    traceEvents.forEach(evt => Object.assign(evt, {cat: 'devtools.timeline'}));
+    traceEvents.filter(evt => !evt.cat).forEach(evt => {
+      evt.cat = 'devtools.timeline';
+      evt.args = evt.args || args;
+    });
 
     const tasks = run({traceEvents});
     const [taskA, taskB] = tasks;
@@ -720,7 +750,10 @@ describe('Main Thread Tasks', () => {
       {ph: 'I', name: 'MarkerToPushOutTraceEnd', pid, tid, ts: baseTs + 110e3, args},
     ];
 
-    traceEvents.forEach(evt => Object.assign(evt, {cat: 'devtools.timeline'}));
+    traceEvents.filter(evt => !evt.cat).forEach(evt => {
+      evt.cat = 'devtools.timeline';
+      evt.args = evt.args || args;
+    });
 
     const tasks = run({traceEvents});
     const [taskA, taskB] = tasks;
@@ -772,7 +805,10 @@ describe('Main Thread Tasks', () => {
       {ph: 'E', name: 'TaskA', pid, tid, ts: baseTs + 100e3, args},
     ];
 
-    traceEvents.forEach(evt => Object.assign(evt, {cat: 'devtools.timeline'}));
+    traceEvents.filter(evt => !evt.cat).forEach(evt => {
+      evt.cat = 'devtools.timeline';
+      evt.args = evt.args || args;
+    });
 
     const tasks = run({traceEvents});
     const [taskA, taskB, taskC] = tasks;
@@ -869,7 +905,10 @@ describe('Main Thread Tasks', () => {
   for (const invalidEvents of invalidEventSets) {
     it('should throw on invalid task input', () => {
       const traceEvents = [...boilerplateTrace, ...invalidEvents];
-      traceEvents.forEach(evt => Object.assign(evt, {cat: 'devtools.timeline'}));
+      traceEvents.filter(evt => !evt.cat).forEach(evt => {
+        evt.cat = 'devtools.timeline';
+        evt.args = evt.args || args;
+      });
       expect(() => run({traceEvents})).toThrow();
     });
   }
@@ -885,7 +924,10 @@ describe('Main Thread Tasks', () => {
         {ph: 'X', name: 'TaskD', pid, tid, ts: baseTs + 60e3, dur: 30e3, args},
       ];
 
-      traceEvents.forEach(evt => Object.assign(evt, {cat: 'devtools.timeline'}));
+      traceEvents.filter(evt => !evt.cat).forEach(evt => {
+        evt.cat = 'devtools.timeline';
+        evt.args = evt.args || args;
+      });
 
       const tasks = run({traceEvents});
       const taskTreeAsString = MainThreadTasks.printTaskTreeToDebugString(tasks, {printWidth: 50});

@@ -6,12 +6,12 @@
 
 import lighthouseStackPacksDep from 'lighthouse-stack-packs';
 
-import {initializeConfig} from '../../fraggle-rock/config/config.js';
+import {initializeConfig} from '../../config/config.js';
 import {stackPacksToInclude} from '../../lib/stack-packs.js';
 
 async function getAuditIds() {
-  const {config} = await initializeConfig(undefined, {gatherMode: 'navigation'});
-  return config.audits.map(a => a.implementation.meta.id);
+  const {resolvedConfig} = await initializeConfig('navigation');
+  return resolvedConfig.audits.map(a => a.implementation.meta.id);
 }
 
 describe('stack-packs lib', () => {
@@ -39,6 +39,7 @@ Array [
   "octobercms",
   "react",
   "wordpress",
+  "wp-rocket",
 ]
 `);
   });
@@ -159,7 +160,7 @@ Array [
       "uses-text-compression",
       "uses-responsive-images",
       "user-timings",
-      "preload-lcp-image",
+      "prioritize-lcp-image",
       "unsized-images",
     ],
   },
@@ -170,7 +171,7 @@ Array [
       "offscreen-images",
       "uses-optimized-images",
       "uses-responsive-images",
-      "preload-lcp-image",
+      "prioritize-lcp-image",
       "unsized-images",
     ],
   },
@@ -222,6 +223,21 @@ Array [
       "uses-text-compression",
       "uses-responsive-images",
       "server-response-time",
+    ],
+  },
+  Object {
+    "id": "wp-rocket",
+    "keys": Array [
+      "unused-css-rules",
+      "modern-image-formats",
+      "unused-javascript",
+      "render-blocking-resources",
+      "unminified-css",
+      "unminified-javascript",
+      "uses-optimized-images",
+      "uses-rel-preconnect",
+      "uses-rel-preload",
+      "offscreen-images",
     ],
   },
 ]

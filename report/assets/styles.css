@@ -145,6 +145,8 @@
   --sparkline-height: 5px;
   --stackpack-padding-horizontal: 10px;
   --sticky-header-background-color: var(--report-background-color);
+  --sticky-header-buffer: calc(var(--topbar-height) + var(--sticky-header-height));
+  --sticky-header-height: calc(var(--gauge-circle-size-sm) + var(--score-container-padding) * 2);
   --table-higlight-background-color: hsla(210, 17%, 77%, 0.1);
   --tools-icon-color: var(--color-gray-600);
   --topbar-background-color: var(--color-white);
@@ -280,6 +282,12 @@
   --section-padding-vertical: 8px;
 }
 
+.lh-container:not(.lh-topbar + .lh-container) {
+  --topbar-height: 0;
+  --sticky-header-height: 0;
+  --sticky-header-buffer: 0;
+}
+
 .lh-devtools.lh-root {
   height: 100%;
 }
@@ -290,6 +298,8 @@
 .lh-devtools .lh-container {
   overflow-y: scroll;
   height: calc(100% - var(--topbar-height));
+  /** The .lh-container is the scroll parent in DevTools so we exclude the topbar from the sticky header buffer. */
+  --sticky-header-buffer: calc(var(--sticky-header-height));
 }
 @media print {
   .lh-devtools .lh-container {
@@ -322,7 +332,7 @@
   color: var(--report-text-color);
 }
 
-.lh-root :focus {
+.lh-root :focus-visible {
     outline: -webkit-focus-ring-color auto 3px;
 }
 .lh-root summary:focus {
@@ -873,7 +883,7 @@
 
 .lh-audit--load-opportunity .lh-audit__display-text {
   text-align: right;
-  flex: 0 0 calc(3 * var(--report-font-size));
+  flex: 0 0 7.5ch;
 }
 
 
@@ -918,7 +928,7 @@
   justify-content: space-between;
   padding-bottom: var(--default-padding);
   width: 100%;
-  grid-template-columns: repeat(auto-fit, 60px);
+  grid-template-columns: repeat(auto-fit, 90px);
 }
 
 .lh-filmstrip__frame {
@@ -928,8 +938,8 @@
 
 .lh-filmstrip__thumbnail {
   border: 1px solid var(--report-border-color-secondary);
-  max-height: 100px;
-  max-width: 60px;
+  max-height: 150px;
+  max-width: 120px;
 }
 
 /* Audit */
@@ -1261,7 +1271,7 @@
 .lh-gauge-arc {
   fill: none;
   transform-origin: 50% 50%;
-  animation: load-gauge var(--transition-length) ease forwards;
+  animation: load-gauge var(--transition-length) ease both;
   animation-delay: 250ms;
 }
 
@@ -1401,7 +1411,6 @@
 
 .lh-categories {
   width: 100%;
-  overflow: hidden;
 }
 
 .lh-category {
@@ -1409,9 +1418,7 @@
   max-width: var(--report-content-max-width);
   margin: 0 auto;
 
-  --sticky-header-height: calc(var(--gauge-circle-size-sm) + var(--score-container-padding) * 2);
-  --topbar-plus-sticky-header: calc(var(--topbar-height) + var(--sticky-header-height));
-  scroll-margin-top: var(--topbar-plus-sticky-header);
+  scroll-margin-top: var(--sticky-header-buffer);
 
   /* Faster recalc style & layout of the report. https://web.dev/content-visibility/ */
   content-visibility: auto;
@@ -1496,14 +1503,20 @@
 }
 
 .lh-table {
-  border-collapse: collapse;
+  position: relative;
+  border-collapse: separate;
+  border-spacing: 0;
   /* Can't assign padding to table, so shorten the width instead. */
   width: calc(100% - var(--audit-description-padding-left) - var(--stackpack-padding-horizontal));
   border: 1px solid var(--report-border-color-secondary);
-
 }
 
 .lh-table thead th {
+  position: sticky;
+  top: calc(var(--sticky-header-buffer) + 1em);
+  z-index: 1;
+  background-color: var(--report-background-color);
+  border-bottom: 1px solid var(--report-border-color-secondary);
   font-weight: normal;
   color: var(--color-gray-600);
   /* See text-wrapping comment on .lh-container. */

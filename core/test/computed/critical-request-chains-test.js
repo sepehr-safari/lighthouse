@@ -4,9 +4,9 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 
-import {strict as assert} from 'assert';
+import assert from 'assert/strict';
 
-import CriticalRequestChains from '../../computed/critical-request-chains.js';
+import {CriticalRequestChains} from '../../computed/critical-request-chains.js';
 import {NetworkRequest} from '../../lib/network-request.js';
 import {createTestTrace} from '../create-test-trace.js';
 import {networkRecordsToDevtoolsLog} from '../network-records-to-devtools-log.js';
@@ -31,9 +31,9 @@ async function createChainsFromMockRecords(prioritiesList, edges, setExtrasFn, r
     priority,
     initiator: {type: 'parser'},
     statusCode: 200,
-    startTime: index,
-    responseReceivedTime: index + 0.5,
-    endTime: index + 1,
+    networkRequestTime: index,
+    responseHeadersEndTime: index + 0.5,
+    networkEndTime: index + 1,
   }));
 
   if (setExtrasFn) setExtrasFn(networkRecords);
@@ -55,10 +55,9 @@ async function createChainsFromMockRecords(prioritiesList, edges, setExtrasFn, r
 
   const trace = createTestTrace({topLevelTasks: [{ts: 0}]});
   const URL = {
-    initialUrl: 'about:blank',
     requestedUrl: docUrl,
     mainDocumentUrl: docUrl,
-    finalUrl: docUrl,
+    finalDisplayedUrl: docUrl,
   };
   const devtoolsLog = networkRecordsToDevtoolsLog(networkRecords);
 
@@ -285,7 +284,7 @@ describe('CriticalRequestChain computed artifact', () => {
         // Make a fake redirect. Network recorder *appends* `:redirect` on a redirected request.
         networkRecords[1].requestId = '1';
         networkRecords[1].resourceType = undefined;
-        networkRecords[1].responseReceivedTime = 2;
+        networkRecords[1].responseHeadersEndTime = 2;
 
         networkRecords[2].requestId = '1:redirect';
         networkRecords[2].url = 'https://example.com/redirected-stylesheet';
@@ -389,7 +388,7 @@ describe('CriticalRequestChain computed artifact', () => {
         networkRecords[3].url = 'https://example.com/redirect-iframe-src';
         networkRecords[3].resourceType = undefined;
         networkRecords[3].frameId = '4';
-        networkRecords[3].responseReceivedTime = 4;
+        networkRecords[3].responseHeadersEndTime = 4;
         // 5th record is an iframe in the page that was redirect destination.
         networkRecords[4].requestId = '3:redirect';
         networkRecords[4].url = 'https://example.com/redirect-iframe-dest';

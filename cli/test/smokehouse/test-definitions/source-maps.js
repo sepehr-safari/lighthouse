@@ -8,7 +8,7 @@ import fs from 'fs';
 
 import {LH_ROOT} from '../../../../root.js';
 
-/** @type {LH.Config.Json} */
+/** @type {LH.Config} */
 const config = {
   extends: 'lighthouse:default',
   settings: {
@@ -44,7 +44,7 @@ const expectations = {
   },
   lhr: {
     requestedUrl: 'http://localhost:10200/source-map/source-map-tester.html',
-    finalUrl: 'http://localhost:10200/source-map/source-map-tester.html',
+    finalDisplayedUrl: 'http://localhost:10200/source-map/source-map-tester.html',
     audits: {},
   },
 };

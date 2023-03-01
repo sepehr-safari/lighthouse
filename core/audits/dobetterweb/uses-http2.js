@@ -3,7 +3,6 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
-'use strict';
 
 /**
  * @fileoverview Audit a page to ensure that resource loaded over its own
@@ -14,23 +13,22 @@
 /** @typedef {import('../../lib/dependency-graph/base-node.js').Node} Node */
 
 import {Audit} from '../audit.js';
-
-import ThirdParty from '../../lib/third-party-web.js';
-import URL from '../../lib/url-shim.js';
+import {EntityClassification} from '../../computed/entity-classification.js';
+import UrlUtils from '../../lib/url-utils.js';
 import {ByteEfficiencyAudit} from '../byte-efficiency/byte-efficiency-audit.js';
-import Interactive from '../../computed/metrics/lantern-interactive.js';
+import {LanternInteractive} from '../../computed/metrics/lantern-interactive.js';
 import {NetworkRequest} from '../../lib/network-request.js';
-import NetworkRecords from '../../computed/network-records.js';
-import LoadSimulator from '../../computed/load-simulator.js';
-import PageDependencyGraph from '../../computed/page-dependency-graph.js';
+import {NetworkRecords} from '../../computed/network-records.js';
+import {LoadSimulator} from '../../computed/load-simulator.js';
+import {PageDependencyGraph} from '../../computed/page-dependency-graph.js';
 import * as i18n from '../../lib/i18n/i18n.js';
 
 const UIStrings = {
   /** Imperative title of a Lighthouse audit that tells the user to enable HTTP/2. This is displayed in a list of audit titles that Lighthouse generates. */
   title: 'Use HTTP/2',
-  /** Description of a Lighthouse audit that tells the user why they should use HTTP/2. This is displayed after a user expands the section to see more. No character length limits. 'Learn More' becomes link text to additional documentation. */
+  /** Description of a Lighthouse audit that tells the user why they should use HTTP/2. This is displayed after a user expands the section to see more. No character length limits. The last sentence starting with 'Learn' becomes link text to additional documentation. */
   description: 'HTTP/2 offers many benefits over HTTP/1.1, including binary headers and ' +
-      'multiplexing. [Learn more about HTTP/2](https://web.dev/uses-http2/).',
+      'multiplexing. [Learn more about HTTP/2](https://developer.chrome.com/docs/lighthouse/best-practices/uses-http2/).',
   /** [ICU Syntax] Label identifying the number of network requests that were not served with HTTP/2. */
   displayValue: `{itemCount, plural,
     =1 {1 request not served via HTTP/2}
@@ -108,8 +106,8 @@ class UsesHTTP2Audit extends Audit {
     });
 
     const savingsOnOverallLoad = simulationBefore.timeInMs - simulationAfter.timeInMs;
-    const savingsOnTTI = Interactive.getLastLongTaskEndTime(simulationBefore.nodeTimings) -
-      Interactive.getLastLongTaskEndTime(simulationAfter.nodeTimings);
+    const savingsOnTTI = LanternInteractive.getLastLongTaskEndTime(simulationBefore.nodeTimings) -
+      LanternInteractive.getLastLongTaskEndTime(simulationAfter.nodeTimings);
     const savings = Math.max(savingsOnTTI, savingsOnOverallLoad);
 
     // Round waste to nearest 10ms
@@ -122,16 +120,19 @@ class UsesHTTP2Audit extends Audit {
    * for the same origin at the exact same time.
    *
    * @param {LH.Artifacts.NetworkRequest} networkRequest
+   * @param {LH.Artifacts.EntityClassification} classifiedEntities
    * @return {boolean}
    */
-  static isStaticAsset(networkRequest) {
+  static isStaticAsset(networkRequest, classifiedEntities) {
     if (!STATIC_RESOURCE_TYPES.has(networkRequest.resourceType)) return false;
 
     // Resources from third-parties that are less than 100 bytes are usually tracking pixels, not actual resources.
     // They can masquerade as static types though (gifs, documents, etc)
     if (networkRequest.resourceSize < 100) {
-      const entity = ThirdParty.getEntity(networkRequest.url);
-      if (entity) return false;
+      // This logic needs to be revisited.
+      // See https://github.com/GoogleChrome/lighthouse/issues/14661
+      const entity = classifiedEntities.entityByUrl.get(networkRequest.url);
+      if (entity && !entity.isUnrecognized) return false;
     }
 
     return true;
@@ -157,9 +158,10 @@ class UsesHTTP2Audit extends Audit {
    *      https://www.cachefly.com/http-2-is-not-a-magic-bullet/
    *
    * @param {Array<LH.Artifacts.NetworkRequest>} networkRecords
+   * @param {LH.Artifacts.EntityClassification} classifiedEntities
    * @return {Array<{url: string, protocol: string}>}
    */
-  static determineNonHttp2Resources(networkRecords) {
+  static determineNonHttp2Resources(networkRecords, classifiedEntities) {
     /** @type {Array<{url: string, protocol: string}>} */
     const nonHttp2Resources = [];
 
@@ -168,8 +170,8 @@ class UsesHTTP2Audit extends Audit {
     /** @type {Map<string, Array<LH.Artifacts.NetworkRequest>>} */
     const groupedByOrigin = new Map();
     for (const record of networkRecords) {
-      if (!UsesHTTP2Audit.isStaticAsset(record)) continue;
-      if (URL.isLikeLocalhost(record.parsedURL.host)) continue;
+      if (!UsesHTTP2Audit.isStaticAsset(record, classifiedEntities)) continue;
+      if (UrlUtils.isLikeLocalhost(record.parsedURL.host)) continue;
       const existing = groupedByOrigin.get(record.parsedURL.securityOrigin) || [];
       existing.push(record);
       groupedByOrigin.set(record.parsedURL.securityOrigin, existing);
@@ -205,7 +207,8 @@ class UsesHTTP2Audit extends Audit {
     const devtoolsLog = artifacts.devtoolsLogs[Audit.DEFAULT_PASS];
     const URL = artifacts.URL;
     const networkRecords = await NetworkRecords.request(devtoolsLog, context);
-    const resources = UsesHTTP2Audit.determineNonHttp2Resources(networkRecords);
+    const classifiedEntities = await EntityClassification.request({URL, devtoolsLog}, context);
+    const resources = UsesHTTP2Audit.determineNonHttp2Resources(networkRecords, classifiedEntities);
 
     let displayValue;
     if (resources.length > 0) {
@@ -216,8 +219,8 @@ class UsesHTTP2Audit extends Audit {
     if (artifacts.GatherContext.gatherMode === 'timespan') {
       /** @type {LH.Audit.Details.Table['headings']} */
       const headings = [
-        {key: 'url', itemType: 'url', text: str_(i18n.UIStrings.columnURL)},
-        {key: 'protocol', itemType: 'text', text: str_(UIStrings.columnProtocol)},
+        {key: 'url', valueType: 'url', label: str_(i18n.UIStrings.columnURL)},
+        {key: 'protocol', valueType: 'text', label: str_(UIStrings.columnProtocol)},
       ];
 
       const details = Audit.makeTableDetails(headings, resources);
@@ -244,7 +247,8 @@ class UsesHTTP2Audit extends Audit {
       {key: 'protocol', valueType: 'text', label: str_(UIStrings.columnProtocol)},
     ];
 
-    const details = Audit.makeOpportunityDetails(headings, resources, wastedMs);
+    const details = Audit.makeOpportunityDetails(headings, resources,
+      {overallSavingsMs: wastedMs});
 
     return {
       displayValue,

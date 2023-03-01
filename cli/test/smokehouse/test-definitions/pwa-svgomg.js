@@ -8,7 +8,7 @@ import pwaDetailsExpectations from './pwa-expectations-details.js';
 
 const jakeExpectations = {...pwaDetailsExpectations, hasShortName: false};
 
-/** @type {LH.Config.Json} */
+/** @type {LH.Config} */
 const config = {
   extends: 'lighthouse:default',
   settings: {
@@ -29,7 +29,7 @@ const expectations = {
       length: 1,
     },
     requestedUrl: 'https://jakearchibald.github.io/svgomg/',
-    finalUrl: 'https://jakearchibald.github.io/svgomg/',
+    finalDisplayedUrl: 'https://jakearchibald.github.io/svgomg/',
     audits: {
       'service-worker': {
         score: 1,

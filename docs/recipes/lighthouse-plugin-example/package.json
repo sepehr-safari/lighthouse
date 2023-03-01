@@ -4,7 +4,7 @@
   "type": "module",
   "main": "./plugin.js",
   "peerDependencies": {
-    "lighthouse": "^9.5.0"
+    "lighthouse": "^10.0.2"
   },
   "devDependencies": {
     "lighthouse": "^8.6.0"

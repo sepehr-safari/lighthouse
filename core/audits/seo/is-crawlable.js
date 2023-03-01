@@ -3,15 +3,20 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
-'use strict';
-
-import {Audit} from '../audit.js';
 
 import robotsParser from 'robots-parser';
 
-import URL from '../../lib/url-shim.js';
-import MainResource from '../../computed/main-resource.js';
+import {Audit} from '../audit.js';
+import {MainResource} from '../../computed/main-resource.js';
 import * as i18n from '../../lib/i18n/i18n.js';
+
+const BOT_USER_AGENTS = new Set([
+  undefined,
+  'Googlebot',
+  'bingbot',
+  'DuckDuckBot',
+  'archive.org_bot',
+]);
 
 const BLOCKLIST = new Set([
   'noindex',
@@ -25,9 +30,9 @@ const UIStrings = {
   title: 'Page isn’t blocked from indexing',
   /** Title of a Lighthouse audit that provides detail on if search-engine crawlers are blocked from indexing the page. This title is shown when the page has been configured to block indexing and therefore cannot be indexed by search engines. */
   failureTitle: 'Page is blocked from indexing',
-  /** Description of a Lighthouse audit that tells the user *why* allowing search-engine crawling of their page is beneficial. This is displayed after a user expands the section to see more. No character length limits. 'Learn More' becomes link text to additional documentation. */
+  /** Description of a Lighthouse audit that tells the user *why* allowing search-engine crawling of their page is beneficial. This is displayed after a user expands the section to see more. No character length limits. The last sentence starting with 'Learn' becomes link text to additional documentation. */
   description: 'Search engines are unable to include your pages in search results ' +
-      'if they don\'t have permission to crawl them. [Learn more about crawler directives](https://web.dev/is-crawable/).',
+      'if they don\'t have permission to crawl them. [Learn more about crawler directives](https://developer.chrome.com/docs/lighthouse/seo/is-crawlable/).',
 };
 
 const str_ = i18n.createIcuMessageFn(import.meta.url, UIStrings);
@@ -51,7 +56,7 @@ function isUnavailable(directive) {
 
 /**
  * Returns true if any of provided directives blocks page from being indexed
- * @param {string} directives
+ * @param {string} directives assumes no user-agent prefix
  * @return {boolean}
  */
 function hasBlockingDirective(directives) {
@@ -61,16 +66,18 @@ function hasBlockingDirective(directives) {
 }
 
 /**
- * Returns true if robots header specifies user agent (e.g. `googlebot: noindex`)
+ * Returns user agent if specified in robots header (e.g. `googlebot: noindex`)
  * @param {string} directives
- * @return {boolean}
+ * @return {string|undefined}
  */
-function hasUserAgent(directives) {
+function getUserAgentFromHeaderDirectives(directives) {
   const parts = directives.match(/^([^,:]+):/);
 
   // Check if directives are prefixed with `googlebot:`, `googlebot-news:`, `otherbot:`, etc.
   // but ignore `unavailable_after:` which is a valid directive
-  return !!parts && parts[1].toLowerCase() !== UNAVAILABLE_AFTER;
+  if (!!parts && parts[1].toLowerCase() !== UNAVAILABLE_AFTER) {
+    return parts[1];
+  }
 }
 
 class IsCrawlable extends Audit {
@@ -89,67 +96,126 @@ class IsCrawlable extends Audit {
   }
 
   /**
+   * @param {LH.Artifacts.MetaElement} metaElement
+   */
+  static handleMetaElement(metaElement) {
+    const content = metaElement.content || '';
+    if (hasBlockingDirective(content)) {
+      return {
+        source: {
+          ...Audit.makeNodeItem(metaElement.node),
+          snippet: `<meta name="${metaElement.name}" content="${content}" />`,
+        },
+      };
+    }
+  }
+
+  /**
+   * @param {string|undefined} userAgent
+   * @param {LH.Artifacts.NetworkRequest} mainResource
+   * @param {LH.Artifacts.MetaElement[]} metaElements
+   * @param {import('robots-parser').Robot|undefined} parsedRobotsTxt
+   * @param {URL} robotsTxtUrl
+   */
+  static determineIfCrawlableForUserAgent(userAgent, mainResource, metaElements,
+      parsedRobotsTxt, robotsTxtUrl) {
+    /** @type {LH.Audit.Details.Table['items']} */
+    const blockingDirectives = [];
+
+    // Prefer a meta element specific to a user agent, fallback to generic 'robots' if not present.
+    // https://developers.google.com/search/blog/2007/03/using-robots-meta-tag#directing-a-robots-meta-tag-specifically-at-googlebot
+    let meta;
+    if (userAgent) meta = metaElements.find(meta => meta.name === userAgent.toLowerCase());
+    if (!meta) meta = metaElements.find(meta => meta.name === 'robots');
+    if (meta) {
+      const blockingDirective = IsCrawlable.handleMetaElement(meta);
+      if (blockingDirective) blockingDirectives.push(blockingDirective);
+    }
+
+    for (const header of mainResource.responseHeaders || []) {
+      if (header.name.toLowerCase() !== ROBOTS_HEADER) continue;
+
+      const directiveUserAgent = getUserAgentFromHeaderDirectives(header.value);
+      if (directiveUserAgent !== userAgent && directiveUserAgent !== undefined) continue;
+
+      let directiveWithoutUserAgentPrefix = header.value.trim();
+      if (userAgent && header.value.startsWith(`${userAgent}:`)) {
+        directiveWithoutUserAgentPrefix = header.value.replace(`${userAgent}:`, '');
+      }
+      if (!hasBlockingDirective(directiveWithoutUserAgentPrefix)) continue;
+
+      blockingDirectives.push({source: `${header.name}: ${header.value}`});
+    }
+
+    if (parsedRobotsTxt && !parsedRobotsTxt.isAllowed(mainResource.url, userAgent)) {
+      const line = parsedRobotsTxt.getMatchingLineNumber(mainResource.url) || 1;
+      blockingDirectives.push({
+        source: {
+          type: /** @type {const} */ ('source-location'),
+          url: robotsTxtUrl.href,
+          urlProvider: /** @type {const} */ ('network'),
+          line: line - 1,
+          column: 0,
+        },
+      });
+    }
+
+    return blockingDirectives;
+  }
+
+  /**
    * @param {LH.Artifacts} artifacts
    * @param {LH.Audit.Context} context
    * @return {Promise<LH.Audit.Product>}
    */
-  static audit(artifacts, context) {
+  static async audit(artifacts, context) {
     const devtoolsLog = artifacts.devtoolsLogs[Audit.DEFAULT_PASS];
-    const metaRobots = artifacts.MetaElements.find(meta => meta.name === 'robots');
+    const mainResource = await MainResource.request({devtoolsLog, URL: artifacts.URL}, context);
 
-    return MainResource.request({devtoolsLog, URL: artifacts.URL}, context)
-      .then(mainResource => {
-        /** @type {LH.Audit.Details.Table['items']} */
-        const blockingDirectives = [];
+    const robotsTxtUrl = new URL('/robots.txt', mainResource.url);
+    const parsedRobotsTxt = artifacts.RobotsTxt.content ?
+      robotsParser(robotsTxtUrl.href, artifacts.RobotsTxt.content) :
+      undefined;
 
-        if (metaRobots) {
-          const metaRobotsContent = metaRobots.content || '';
-          const isBlocking = hasBlockingDirective(metaRobotsContent);
+    // Only fail if all known bots and generic bots (UserAgent '*' or 'robots' directive)
+    // are blocked from crawling.
+    // If at least one bot is allowed, we pass the audit. Any known bots that are not allowed
+    // will be listed in a warning.
 
-          if (isBlocking) {
-            blockingDirectives.push({
-              source: {
-                ...Audit.makeNodeItem(metaRobots.node),
-                snippet: `<meta name="robots" content="${metaRobotsContent}" />`,
-              },
-            });
-          }
-        }
+    /** @type {Array<string|undefined>} */
+    const blockedUserAgents = [];
+    const genericBlockingDirectives = [];
 
-        mainResource.responseHeaders && mainResource.responseHeaders
-          .filter(h => h.name.toLowerCase() === ROBOTS_HEADER && !hasUserAgent(h.value) &&
-            hasBlockingDirective(h.value))
-          .forEach(h => blockingDirectives.push({source: `${h.name}: ${h.value}`}));
+    for (const userAgent of BOT_USER_AGENTS) {
+      const blockingDirectives = IsCrawlable.determineIfCrawlableForUserAgent(
+        userAgent, mainResource, artifacts.MetaElements, parsedRobotsTxt, robotsTxtUrl);
+      if (blockingDirectives.length > 0) {
+        blockedUserAgents.push(userAgent);
+      }
+      if (userAgent === undefined) {
+        genericBlockingDirectives.push(...blockingDirectives);
+      }
+    }
 
-        if (artifacts.RobotsTxt.content) {
-          const robotsFileUrl = new URL('/robots.txt', mainResource.url);
-          const robotsTxt = robotsParser(robotsFileUrl.href, artifacts.RobotsTxt.content);
+    const score = blockedUserAgents.length === BOT_USER_AGENTS.size ? 0 : 1;
+    const warnings = [];
+    if (score && blockedUserAgents.length > 0) {
+      const list = blockedUserAgents.filter(Boolean).join(', ');
+      // eslint-disable-next-line max-len
+      warnings.push(`The following bot user agents are blocked from crawling: ${list}. The audit is otherwise passing, because at least one bot was explicitly allowed.`);
+    }
 
-          if (!robotsTxt.isAllowed(mainResource.url)) {
-            const line = robotsTxt.getMatchingLineNumber(mainResource.url) || 1;
-            blockingDirectives.push({
-              source: {
-                type: /** @type {const} */ ('source-location'),
-                url: robotsFileUrl.href,
-                urlProvider: /** @type {const} */ ('network'),
-                line: line - 1,
-                column: 0,
-              },
-            });
-          }
-        }
+    /** @type {LH.Audit.Details.Table['headings']} */
+    const headings = [
+      {key: 'source', valueType: 'code', label: 'Blocking Directive Source'},
+    ];
+    const details = Audit.makeTableDetails(headings, score === 0 ? genericBlockingDirectives : []);
 
-        /** @type {LH.Audit.Details.Table['headings']} */
-        const headings = [
-          {key: 'source', itemType: 'code', text: 'Blocking Directive Source'},
-        ];
-        const details = Audit.makeTableDetails(headings, blockingDirectives);
-
-        return {
-          score: Number(blockingDirectives.length === 0),
-          details,
-        };
-      });
+    return {
+      score,
+      details,
+      warnings,
+    };
   }
 }
 

@@ -9,5 +9,15 @@
 set -euxo pipefail
 
 DATE=$(date --date=yesterday '+%Y%m%d')
-PATCH=$(node -e "console.log(require('./package.json').version)")
-node core/scripts/release/bump-versions.js "$PATCH-dev.$DATE"
+PKG_VERSION=$(node -e "console.log(require('./package.json').version)")
+BASE_VERSION="$PKG_VERSION-dev.$DATE"
+VERSION="$BASE_VERSION"
+
+i=0
+while npx version-exists@0.0.4 lighthouse "$VERSION"
+do
+  ((i++))
+  VERSION="$BASE_VERSION-$i"
+done
+
+node core/scripts/release/bump-versions.js "$VERSION"

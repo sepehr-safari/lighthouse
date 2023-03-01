@@ -3,11 +3,13 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
-'use strict';
+
+import {EventEmitter} from 'events';
 
 import log from 'lighthouse-logger';
+
 import {NetworkRequest} from './network-request.js';
-import {EventEmitter} from 'events';
+import {PageDependencyGraph} from '../computed/page-dependency-graph.js';
 
 /**
  * @typedef {{
@@ -242,12 +244,14 @@ class NetworkRecorder extends RequestEventEmitter {
     if (record.redirectSource) {
       return record.redirectSource;
     }
-    const stackFrames = record.initiator.stack?.callFrames || [];
-    const initiatorURL = record.initiator.url || stackFrames[0]?.url;
 
+    const initiatorURL = PageDependencyGraph.getNetworkInitiators(record)[0];
     let candidates = recordsByURL.get(initiatorURL) || [];
-    // The initiator must come before the initiated request.
-    candidates = candidates.filter(cand => cand.responseReceivedTime <= record.startTime);
+    // The (valid) initiator must come before the initiated request.
+    candidates = candidates.filter(c => {
+      return c.responseHeadersEndTime <= record.networkRequestTime &&
+          c.finished && !c.failed;
+    });
     if (candidates.length > 1) {
       // Disambiguate based on prefetch. Prefetch requests have type 'Other' and cannot
       // initiate requests, so we drop them here.
@@ -270,6 +274,18 @@ class NetworkRecorder extends RequestEventEmitter {
         cand.resourceType === NetworkRequest.TYPES.Document);
       if (documentCandidates.length) {
         candidates = documentCandidates;
+      }
+    }
+    if (candidates.length > 1) {
+      // If all real loads came from successful preloads (url preloaded and
+      // loads came from the cache), filter to link rel=preload request(s).
+      const linkPreloadCandidates = candidates.filter(c => c.isLinkPreload);
+      if (linkPreloadCandidates.length) {
+        const nonPreloadCandidates = candidates.filter(c => !c.isLinkPreload);
+        const allPreloaded = nonPreloadCandidates.every(c => c.fromDiskCache || c.fromMemoryCache);
+        if (nonPreloadCandidates.length && allPreloaded) {
+          candidates = linkPreloadCandidates;
+        }
       }
     }
 

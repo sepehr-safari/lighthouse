@@ -3,7 +3,6 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
-'use strict';
 
 /**
  * @fileoverview Singluar helper to parse a raw trace and extract the most useful data for
@@ -424,7 +423,7 @@ class TraceProcessor {
 
   /**
    * @param {LH.TraceEvent[]} events
-   * @return {{pid: number, tid: number, frameId: string}}
+   * @return {{startingPid: number, frameId: string}}
    */
   static findMainFrameIds(events) {
     // Prefer the newer TracingStartedInBrowser event first, if it exists
@@ -434,14 +433,9 @@ class TraceProcessor {
       const frameId = mainFrame?.frame;
       const pid = mainFrame?.processId;
 
-      const threadNameEvt = events.find(e => e.pid === pid && e.ph === 'M' &&
-        e.cat === '__metadata' && e.name === 'thread_name' && e.args.name === 'CrRendererMain');
-      const tid = threadNameEvt?.tid;
-
-      if (pid && tid && frameId) {
+      if (pid && frameId) {
         return {
-          pid,
-          tid,
+          startingPid: pid,
           frameId,
         };
       }
@@ -455,8 +449,7 @@ class TraceProcessor {
       const frameId = startedInPageEvt.args.data.page;
       if (frameId) {
         return {
-          pid: startedInPageEvt.pid,
-          tid: startedInPageEvt.tid,
+          startingPid: startedInPageEvt.pid,
           frameId,
         };
       }
@@ -479,14 +472,57 @@ class TraceProcessor {
       const frameId = navStartEvt.args.frame;
       if (frameId) {
         return {
-          pid: navStartEvt.pid,
-          tid: navStartEvt.tid,
+          startingPid: navStartEvt.pid,
           frameId,
         };
       }
     }
 
     throw this.createNoTracingStartedError();
+  }
+
+  /**
+   * If there were any cross-origin navigations, there'll be more than one pid returned
+   * @param {{startingPid: number, frameId: string}} mainFrameInfo
+   * @param {LH.TraceEvent[]} keyEvents
+   * @return {Map<number, number>} Map where keys are process IDs and their values are thread IDs
+   */
+  static findMainFramePidTids(mainFrameInfo, keyEvents) {
+    const frameProcessEvts = keyEvents.filter(evt =>
+      // ProcessReadyInBrowser is used when a processID isn't available when the FrameCommittedInBrowser trace event is emitted.
+      // In that case. FrameCommittedInBrowser has no processId, but a processPseudoId. and the ProcessReadyInBrowser event declares the proper processId.
+      (evt.name === 'FrameCommittedInBrowser' || evt.name === 'ProcessReadyInBrowser') &&
+      evt.args?.data?.frame === mainFrameInfo.frameId &&
+      evt?.args?.data?.processId
+    );
+
+    // "Modern" traces with a navigation have a FrameCommittedInBrowser event
+    const mainFramePids = frameProcessEvts.length
+      ? frameProcessEvts.map(e => e?.args?.data?.processId)
+      // …But old traces and some timespan traces may not. In these situations, we'll assume the
+      // primary process ID remains constant (as there were no navigations).
+      : [mainFrameInfo.startingPid];
+
+    const pidToTid = new Map();
+
+    for (const pid of new Set(mainFramePids)) {
+      // While renderer tids are generally predictable, we'll doublecheck it
+      const threadNameEvt = keyEvents.find(e =>
+        e.cat === '__metadata' &&
+        e.pid === pid &&
+        e.ph === 'M' &&
+        e.name === 'thread_name' &&
+        e.args.name === 'CrRendererMain'
+      );
+      const tid = threadNameEvt?.tid;
+
+      if (!tid) {
+        throw new Error('Unable to determine tid for renderer process');
+      }
+
+      pidToTid.set(pid, tid);
+    }
+    return pidToTid;
   }
 
   /**
@@ -584,6 +620,9 @@ class TraceProcessor {
       while (parentFrames.has(cur)) {
         cur = /** @type {string} */ (parentFrames.get(cur));
       }
+      if (cur === undefined) {
+        throw new Error('Unexpected undefined frameId');
+      }
       frameIdToRootFrameId.set(frame.id, cur);
     }
 
@@ -610,7 +649,15 @@ class TraceProcessor {
     });
 
     // Find the inspected frame
-    const mainFrameIds = this.findMainFrameIds(keyEvents);
+    const mainFrameInfo = this.findMainFrameIds(keyEvents);
+    const rendererPidToTid = this.findMainFramePidTids(mainFrameInfo, keyEvents);
+
+    // Subset all trace events to just our tab's process (incl threads other than main)
+    // stable-sort events to keep them correctly nested.
+    const processEvents = TraceProcessor
+      .filteredTraceSort(trace.traceEvents, e => rendererPidToTid.has(e.pid));
+
+    // TODO(paulirish): filter down frames (and subsequent actions) to the primary process tree & frame tree
 
     /** @type {Map<string, {id: string, url: string, parent?: string}>} */
     const framesById = new Map();
@@ -646,43 +693,52 @@ class TraceProcessor {
           parent: evt.args.data.parent,
         });
       });
+
     const frames = [...framesById.values()];
     const frameIdToRootFrameId = this.resolveRootFrames(frames);
 
-    // Filter to just events matching the main frame ID, just to make sure.
-    const frameEvents = keyEvents.filter(e => e.args.frame === mainFrameIds.frameId);
+    const inspectedTreeFrameIds = [...frameIdToRootFrameId.entries()]
+      .filter(([, rootFrameId]) => rootFrameId === mainFrameInfo.frameId)
+      .map(([child]) => child);
 
-    // Filter to just events matching the main frame ID or any child frame IDs.
+    // Filter to just events matching the main frame ID, just to make sure.
+    /** @param {LH.TraceEvent} e */
+    function associatedToMainFrame(e) {
+      const frameId = e.args?.data?.frame || e.args.frame;
+      return frameId === mainFrameInfo.frameId;
+    }
+
+    /** @param {LH.TraceEvent} e */
+    function associatedToAllFrames(e) {
+      const frameId = e.args?.data?.frame || e.args.frame;
+      return frameId ? inspectedTreeFrameIds.includes(frameId) : false;
+    }
+    const frameEvents = keyEvents.filter(e => associatedToMainFrame(e));
+
+    // Filter to just events matching the main frame ID or any child frame IDs. The subframes
+    // are either in-process (same origin) or, potentially, out-of-process. (OOPIFs)
     let frameTreeEvents = [];
-    if (frameIdToRootFrameId.has(mainFrameIds.frameId)) {
-      frameTreeEvents = keyEvents.filter(e => {
-        return e.args.frame && frameIdToRootFrameId.get(e.args.frame) === mainFrameIds.frameId;
-      });
+    if (frameIdToRootFrameId.has(mainFrameInfo.frameId)) {
+      frameTreeEvents = keyEvents.filter(e => associatedToAllFrames(e));
     } else {
       // In practice, there should always be TracingStartedInBrowser/FrameCommittedInBrowser events to
       // define the frame tree. Unfortunately, many test traces do not that frame info due to minification.
       // This ensures there is always a minimal frame tree and events so those tests don't fail.
       log.warn(
-        'trace-of-tab',
+        'TraceProcessor',
         'frameTreeEvents may be incomplete, make sure the trace has frame events'
       );
-      frameIdToRootFrameId.set(mainFrameIds.frameId, mainFrameIds.frameId);
+      frameIdToRootFrameId.set(mainFrameInfo.frameId, mainFrameInfo.frameId);
       frameTreeEvents = frameEvents;
     }
 
     // Compute our time origin to use for all relative timings.
     const timeOriginEvt = this.computeTimeOrigin(
-      {keyEvents, frameEvents, mainFrameIds},
+      {keyEvents, frameEvents, mainFrameInfo: mainFrameInfo},
       timeOriginDeterminationMethod
     );
 
-    // Subset all trace events to just our tab's process (incl threads other than main)
-    // stable-sort events to keep them correctly nested.
-    const processEvents = TraceProcessor
-      .filteredTraceSort(trace.traceEvents, e => e.pid === mainFrameIds.pid);
-
-    const mainThreadEvents = processEvents
-      .filter(e => e.tid === mainFrameIds.tid);
+    const mainThreadEvents = processEvents.filter(e => e.tid === rendererPidToTid.get(e.pid));
 
     // Ensure our traceEnd reflects all page activity.
     const traceEnd = this.computeTraceEnd(trace.traceEvents, timeOriginEvt);
@@ -695,7 +751,7 @@ class TraceProcessor {
       frameEvents,
       frameTreeEvents,
       processEvents,
-      mainFrameIds,
+      mainFrameInfo,
       timeOriginEvt,
       timings: {
         timeOrigin: 0,
@@ -705,6 +761,8 @@ class TraceProcessor {
         timeOrigin: timeOriginEvt.ts,
         traceEnd: traceEnd.timestamp,
       },
+      _keyEvents: keyEvents,
+      _rendererPidToTid: rendererPidToTid,
     };
   }
 
@@ -808,7 +866,7 @@ class TraceProcessor {
    *      Can also be skewed by several hundred milliseconds or even seconds when the browser takes a long
    *      time to unload `about:blank`.
    *
-   * @param {{keyEvents: Array<LH.TraceEvent>, frameEvents: Array<LH.TraceEvent>, mainFrameIds: {frameId: string}}} traceEventSubsets
+   * @param {{keyEvents: Array<LH.TraceEvent>, frameEvents: Array<LH.TraceEvent>, mainFrameInfo: {frameId: string}}} traceEventSubsets
    * @param {TimeOriginDeterminationMethod} method
    * @return {LH.TraceEvent}
    */
@@ -834,7 +892,7 @@ class TraceProcessor {
         const fetchStart = traceEventSubsets.keyEvents.find(event => {
           if (event.name !== 'ResourceSendRequest') return false;
           const data = event.args.data || {};
-          return data.frame === traceEventSubsets.mainFrameIds.frameId;
+          return data.frame === traceEventSubsets.mainFrameInfo.frameId;
         });
         if (!fetchStart) throw this.createNoResourceSendRequestError();
         return fetchStart;
@@ -891,10 +949,11 @@ class TraceProcessor {
     if (!firstMeaningfulPaint) {
       const fmpCand = 'firstMeaningfulPaintCandidate';
       fmpFellBack = true;
-      log.verbose('trace-of-tab', `No firstMeaningfulPaint found, falling back to last ${fmpCand}`);
+      log.verbose('TraceProcessor',
+        `No firstMeaningfulPaint found, falling back to last ${fmpCand}`);
       const lastCandidate = frameEvents.filter(e => e.name === fmpCand).pop();
       if (!lastCandidate) {
-        log.verbose('trace-of-tab', 'No `firstMeaningfulPaintCandidate` events found in trace');
+        log.verbose('TraceProcessor', 'No `firstMeaningfulPaintCandidate` events found in trace');
       }
       firstMeaningfulPaint = lastCandidate;
     }
